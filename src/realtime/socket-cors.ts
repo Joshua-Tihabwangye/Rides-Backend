@@ -15,4 +15,6 @@ function parseSocketCorsOrigins(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export const SOCKET_CORS_ORIGINS = parseSocketCorsOrigins(process.env.SOCKET_CORS_ORIGINS);
+export const SOCKET_EFFECTIVE_CORS_ORIGINS = parseSocketCorsOrigins(
+  process.env.SOCKET_CORS_ORIGINS || process.env.CORS_ORIGINS,
+);

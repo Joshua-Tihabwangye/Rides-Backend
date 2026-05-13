@@ -1,1 +1,1 @@
-export declare const SOCKET_CORS_ORIGINS: string[];
+export declare const SOCKET_EFFECTIVE_CORS_ORIGINS: string[];

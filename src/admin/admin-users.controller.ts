@@ -197,6 +197,16 @@ export class AdminUsersController {
     });
   }
 
+  @Get('roles/:roleId')
+  async getRole(@Param('roleId') roleId: string, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'ADMIN_ROLE_FETCHED',
+      message: 'Role fetched',
+      requestId: getRequestId(req),
+      data: await this.adminService.getRole(roleId),
+    });
+  }
+
   @Post('roles')
   async createRole(
     @CurrentUser() user: AuthenticatedUser,

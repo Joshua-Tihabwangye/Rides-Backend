@@ -1,4 +1,4 @@
-import { Polygon } from 'geojson';
+import type { Polygon } from 'geojson';
 export declare class PricingZone {
     id: string;
     name: string;

@@ -8,7 +8,7 @@ export declare class EarningsCashoutController {
     private readonly apiResponse;
     constructor(earningsService: EarningsCashoutService, apiResponse: ApiResponseService);
     getSummary(user: AuthenticatedUser, query: EarningsSummaryQueryDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
-        period: "year" | "week" | "day" | "month" | "quarter";
+        period: "day" | "week" | "month" | "quarter" | "year";
         total: number;
         currency: string;
         count: number;

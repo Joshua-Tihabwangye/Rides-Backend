@@ -17,12 +17,18 @@ declare abstract class BaseScopedRealtimeGateway implements OnGatewayConnection,
     private readToken;
 }
 export declare class RiderRealtimeGateway extends BaseScopedRealtimeGateway {
+    protected readonly authService: AuthService;
     protected readonly namespaceLabel = "rider";
+    constructor(authService: AuthService);
 }
 export declare class FleetRealtimeGateway extends BaseScopedRealtimeGateway {
+    protected readonly authService: AuthService;
     protected readonly namespaceLabel = "fleet";
+    constructor(authService: AuthService);
 }
 export declare class AdminRealtimeGateway extends BaseScopedRealtimeGateway {
+    protected readonly authService: AuthService;
     protected readonly namespaceLabel = "admin";
+    constructor(authService: AuthService);
 }
 export {};

@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
-import { Point } from 'geojson';
+import type { Point } from 'geojson';
 
 @Entity('vehicles')
 export class Vehicle {

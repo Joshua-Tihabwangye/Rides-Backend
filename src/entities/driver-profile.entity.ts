@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
-import { Point } from 'geojson';
+import type { Point } from 'geojson';
 import { User } from './user.entity';
 
 @Entity('driver_profiles')

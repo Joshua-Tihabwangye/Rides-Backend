@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminRealtimeGateway = exports.FleetRealtimeGateway = exports.RiderRealtimeGateway = void 0;
 const common_1 = require("@nestjs/common");
 const websockets_1 = require("@nestjs/websockets");
+const auth_service_1 = require("../auth/auth.service");
 const socket_cors_1 = require("./socket-cors");
 class BaseScopedRealtimeGateway {
     constructor(authService) {
@@ -27,7 +28,14 @@ class BaseScopedRealtimeGateway {
             client.disconnect(true);
             return;
         }
-        const payload = this.authService.verifyAccessToken(token);
+        let payload = null;
+        try {
+            payload = this.authService.verifyAccessToken(token);
+        }
+        catch {
+            client.disconnect(true);
+            return;
+        }
         if (!payload) {
             client.disconnect(true);
             return;
@@ -79,8 +87,9 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], BaseScopedRealtimeGateway.prototype, "subscribe", null);
 let RiderRealtimeGateway = class RiderRealtimeGateway extends BaseScopedRealtimeGateway {
-    constructor() {
-        super(...arguments);
+    constructor(authService) {
+        super(authService);
+        this.authService = authService;
         this.namespaceLabel = 'rider';
     }
 };
@@ -89,12 +98,14 @@ exports.RiderRealtimeGateway = RiderRealtimeGateway = __decorate([
     (0, common_1.Injectable)(),
     (0, websockets_1.WebSocketGateway)({
         namespace: '/rider',
-        cors: { origin: socket_cors_1.SOCKET_CORS_ORIGINS },
-    })
+        cors: { origin: socket_cors_1.SOCKET_EFFECTIVE_CORS_ORIGINS },
+    }),
+    __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], RiderRealtimeGateway);
 let FleetRealtimeGateway = class FleetRealtimeGateway extends BaseScopedRealtimeGateway {
-    constructor() {
-        super(...arguments);
+    constructor(authService) {
+        super(authService);
+        this.authService = authService;
         this.namespaceLabel = 'fleet';
     }
 };
@@ -103,12 +114,14 @@ exports.FleetRealtimeGateway = FleetRealtimeGateway = __decorate([
     (0, common_1.Injectable)(),
     (0, websockets_1.WebSocketGateway)({
         namespace: '/fleet',
-        cors: { origin: socket_cors_1.SOCKET_CORS_ORIGINS },
-    })
+        cors: { origin: socket_cors_1.SOCKET_EFFECTIVE_CORS_ORIGINS },
+    }),
+    __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], FleetRealtimeGateway);
 let AdminRealtimeGateway = class AdminRealtimeGateway extends BaseScopedRealtimeGateway {
-    constructor() {
-        super(...arguments);
+    constructor(authService) {
+        super(authService);
+        this.authService = authService;
         this.namespaceLabel = 'admin';
     }
 };
@@ -117,7 +130,8 @@ exports.AdminRealtimeGateway = AdminRealtimeGateway = __decorate([
     (0, common_1.Injectable)(),
     (0, websockets_1.WebSocketGateway)({
         namespace: '/admin',
-        cors: { origin: socket_cors_1.SOCKET_CORS_ORIGINS },
-    })
+        cors: { origin: socket_cors_1.SOCKET_EFFECTIVE_CORS_ORIGINS },
+    }),
+    __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], AdminRealtimeGateway);
 //# sourceMappingURL=scoped-realtime.gateway.js.map

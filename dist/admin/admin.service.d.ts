@@ -22,7 +22,7 @@ import { FeatureFlag } from '../entities/feature-flag.entity';
 import { PricingZone } from '../entities/pricing-zone.entity';
 import { RiderServiceRequest } from '../entities/rider-service-request.entity';
 import { AdminRealtimeGateway } from '../realtime/scoped-realtime.gateway';
-import { Polygon } from 'geojson';
+import type { Polygon } from 'geojson';
 type AuditMeta = {
     actorId: string;
     ipAddress?: string;
@@ -297,6 +297,7 @@ export declare class AdminService {
         status: string;
     }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<User>;
     listRoles(): Promise<Role[]>;
+    getRole(roleId: string): Promise<Role>;
     createRole(actorId: string, input: {
         name: string;
         description?: string;

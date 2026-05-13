@@ -119,7 +119,7 @@ export declare class RiderService {
     }>;
     listWalletTransactions(userId: string, limit?: number, offset?: number): Promise<{
         id: string;
-        type: "top_up" | "ride_payment" | "delivery_payment" | "rental_payment" | "tour_payment" | "ambulance_payment" | "refund" | "adjustment";
+        type: "adjustment" | "top_up" | "ride_payment" | "delivery_payment" | "rental_payment" | "tour_payment" | "ambulance_payment" | "refund";
         amount: number;
         currency: string;
         status: "completed";

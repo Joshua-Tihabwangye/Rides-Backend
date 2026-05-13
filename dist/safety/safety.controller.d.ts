@@ -10,7 +10,7 @@ export declare class SafetyController {
     getSafetyState(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         tripId: string;
         temporaryStop: {
-            status: "idle" | "stop_requested" | "temporarily_stopped";
+            status: "stop_requested" | "temporarily_stopped" | "idle";
             requestNote: string | undefined;
         };
         safetyCheck: {
@@ -37,7 +37,7 @@ export declare class SafetyController {
     saveSafetyState(user: AuthenticatedUser, tripId: string, body: Record<string, unknown>, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         tripId: string;
         temporaryStop: {
-            status: "idle" | "stop_requested" | "temporarily_stopped";
+            status: "stop_requested" | "temporarily_stopped" | "idle";
             requestNote: string | undefined;
         };
         safetyCheck: {

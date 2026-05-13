@@ -1,5 +1,6 @@
 import { Repository } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import { Trip } from '../entities/trip.entity';
 import { JobOffer } from '../entities/job-offer.entity';
 import { EarningsLedger } from '../entities/earnings-ledger.entity';
@@ -10,7 +11,8 @@ export declare class TripsService {
     private earningsLedgerRepo;
     private walletRepo;
     private readonly realtimeGateway?;
-    constructor(tripRepo: Repository<Trip>, jobOfferRepo: Repository<JobOffer>, earningsLedgerRepo: Repository<EarningsLedger>, walletRepo: Repository<WalletAccount>, realtimeGateway?: RealtimeGateway | undefined);
+    private readonly riderRealtimeGateway?;
+    constructor(tripRepo: Repository<Trip>, jobOfferRepo: Repository<JobOffer>, earningsLedgerRepo: Repository<EarningsLedger>, walletRepo: Repository<WalletAccount>, realtimeGateway?: RealtimeGateway | undefined, riderRealtimeGateway?: RiderRealtimeGateway | undefined);
     getActive(driverId: string): Promise<Trip | null>;
     list(driverId: string, query: {
         type?: string;

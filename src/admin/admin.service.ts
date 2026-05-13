@@ -25,7 +25,7 @@ import { PricingZone } from '../entities/pricing-zone.entity';
 import { RiderServiceRequest } from '../entities/rider-service-request.entity';
 import { AdminRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import { v4 as uuidv4 } from 'uuid';
-import { Polygon } from 'geojson';
+import type { Polygon } from 'geojson';
 
 type AuditMeta = {
   actorId: string;
@@ -295,6 +295,14 @@ export class AdminService {
 
   async listRoles() {
     return this.roleRepo.find();
+  }
+
+  async getRole(roleId: string) {
+    const role = await this.roleRepo.findOne({ where: { id: roleId } });
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+    return role;
   }
 
   async createRole(actorId: string, input: { name: string; description?: string; permissions: string[] }, meta?: Omit<AuditMeta, 'actorId'>) {

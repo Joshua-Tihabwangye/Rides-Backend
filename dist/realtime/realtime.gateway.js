@@ -29,7 +29,14 @@ let RealtimeGateway = RealtimeGateway_1 = class RealtimeGateway {
             client.disconnect(true);
             return;
         }
-        const payload = this.authService.verifyAccessToken(token);
+        let payload = null;
+        try {
+            payload = this.authService.verifyAccessToken(token);
+        }
+        catch {
+            client.disconnect(true);
+            return;
+        }
         if (!payload) {
             client.disconnect(true);
             return;
@@ -161,7 +168,7 @@ exports.RealtimeGateway = RealtimeGateway = RealtimeGateway_1 = __decorate([
     (0, common_1.Injectable)(),
     (0, websockets_1.WebSocketGateway)({
         namespace: '/driver',
-        cors: { origin: socket_cors_1.SOCKET_CORS_ORIGINS },
+        cors: { origin: socket_cors_1.SOCKET_EFFECTIVE_CORS_ORIGINS },
     }),
     __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], RealtimeGateway);

@@ -123,6 +123,14 @@ let AdminUsersController = class AdminUsersController {
             data: await this.adminService.listRoles(),
         });
     }
+    async getRole(roleId, req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_ROLE_FETCHED',
+            message: 'Role fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.getRole(roleId),
+        });
+    }
     async createRole(user, body, req) {
         return this.apiResponse.success({
             code: 'ADMIN_ROLE_CREATED',
@@ -242,6 +250,14 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AdminUsersController.prototype, "listRoles", null);
+__decorate([
+    (0, common_1.Get)('roles/:roleId'),
+    __param(0, (0, common_1.Param)('roleId')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AdminUsersController.prototype, "getRole", null);
 __decorate([
     (0, common_1.Post)('roles'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

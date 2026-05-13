@@ -11,7 +11,7 @@ export declare class CompatibilityController {
         expiryDate: string;
     }, res: Response): Promise<import("../entities/user-document.entity").UserDocument>;
     getLegacyDocumentStatus(driverId: string, res: Response): Promise<{
-        userType: "rider" | "fleet" | "admin" | "driver";
+        userType: "driver" | "rider" | "fleet" | "admin";
         documents: ({
             id: string;
             documentType: string;
