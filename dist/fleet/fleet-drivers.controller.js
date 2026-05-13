@@ -51,6 +51,22 @@ let FleetDriversController = class FleetDriversController {
             data: await this.fleetService.patchDriver(user.userId, driverId, body),
         });
     }
+    async getById(user, driverId, req) {
+        return this.apiResponse.success({
+            code: 'FLEET_DRIVER_FETCHED',
+            message: 'Fleet driver fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.fleetService.getDriverById(user.userId, driverId),
+        });
+    }
+    async deleteById(user, driverId, req) {
+        return this.apiResponse.success({
+            code: 'FLEET_DRIVER_DELETED',
+            message: 'Fleet driver deleted',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.fleetService.deleteDriver(user.userId, driverId),
+        });
+    }
 };
 exports.FleetDriversController = FleetDriversController;
 __decorate([
@@ -80,6 +96,24 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, fleet_dto_1.UpdateFleetDriverDto, Object]),
     __metadata("design:returntype", Promise)
 ], FleetDriversController.prototype, "patch", null);
+__decorate([
+    (0, common_1.Get)(':driverId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('driverId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], FleetDriversController.prototype, "getById", null);
+__decorate([
+    (0, common_1.Delete)(':driverId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('driverId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], FleetDriversController.prototype, "deleteById", null);
 exports.FleetDriversController = FleetDriversController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('fleet_owner', 'fleet_manager', 'fleet_dispatcher'),

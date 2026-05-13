@@ -96,6 +96,17 @@ export class DocumentsService {
     });
   }
 
+  async deleteForUser(userType: UserType, userId: string, documentId: string) {
+    const doc = await this.documentRepo.findOne({
+      where: { id: documentId, userId, userType },
+    });
+    if (!doc) {
+      throw new NotFoundException('Document not found');
+    }
+    await this.documentRepo.remove(doc);
+    return { deleted: true };
+  }
+
   private buildStatusPayload(userType: UserType, docs: UserDocument[]) {
     const indexed = new Map(docs.map((doc) => [doc.documentType, doc]));
     const requiredTypes = REQUIRED_DOCUMENT_TYPES[userType];

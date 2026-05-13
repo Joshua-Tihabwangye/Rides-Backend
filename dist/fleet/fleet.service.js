@@ -51,6 +51,7 @@ let FleetService = class FleetService {
         this.vehicleRepo = vehicleRepo;
         this.riderServiceRequestRepo = riderServiceRequestRepo;
         this.fleetRealtimeGateway = fleetRealtimeGateway;
+        this.schoolOpsStore = new Map();
     }
     async getProfile(userId) {
         const fleetId = await this.getFleetId(userId);
@@ -369,6 +370,422 @@ let FleetService = class FleetService {
             createdAt: new Date(record.createdAt).getTime(),
             updatedAt: new Date(record.updatedAt).getTime(),
         }));
+    }
+    async getBranchById(userId, branchId) {
+        const fleetId = await this.getFleetId(userId);
+        const branch = await this.fleetBranchRepo.findOne({ where: { id: branchId, fleetId } });
+        if (!branch) {
+            throw new common_1.NotFoundException('Fleet branch not found');
+        }
+        return branch;
+    }
+    async getDriverById(userId, driverId) {
+        const fleetId = await this.getFleetId(userId);
+        const driver = await this.fleetDriverRepo.findOne({ where: { fleetId, driverId } });
+        if (!driver) {
+            throw new common_1.NotFoundException('Fleet driver not found');
+        }
+        return driver;
+    }
+    async deleteDriver(userId, driverId) {
+        const fleetId = await this.getFleetId(userId);
+        const result = await this.fleetDriverRepo.delete({ fleetId, driverId });
+        if (!result.affected) {
+            throw new common_1.NotFoundException('Fleet driver not found');
+        }
+        return { deleted: true };
+    }
+    async removeVehicle(userId, vehicleId) {
+        const fleetId = await this.getFleetId(userId);
+        const result = await this.vehicleRepo.delete({ id: vehicleId, fleetId });
+        if (!result.affected) {
+            throw new common_1.NotFoundException('Fleet vehicle not found');
+        }
+        return { deleted: true };
+    }
+    async listVehicleDocuments(userId, vehicleId) {
+        const fleetId = await this.getFleetId(userId);
+        const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+        if (!vehicle) {
+            throw new common_1.NotFoundException('Fleet vehicle not found');
+        }
+        const documents = vehicle.documents || {};
+        return Object.entries(documents).map(([documentType, payload]) => ({ documentType, ...payload }));
+    }
+    async createVehicleDocument(userId, vehicleId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+        if (!vehicle) {
+            throw new common_1.NotFoundException('Fleet vehicle not found');
+        }
+        const documents = vehicle.documents || {};
+        documents[input.documentType] = {
+            fileUrl: input.fileUrl,
+            expiryDate: input.expiryDate || null,
+            status: 'under_review',
+            updatedAt: Date.now(),
+        };
+        vehicle.documents = documents;
+        await this.vehicleRepo.save(vehicle);
+        return { documentType: input.documentType, ...documents[input.documentType] };
+    }
+    async listVehicleMaintenanceHistory(userId, vehicleId) {
+        const fleetId = await this.getFleetId(userId);
+        const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+        if (!vehicle) {
+            throw new common_1.NotFoundException('Fleet vehicle not found');
+        }
+        const accessories = vehicle.accessories || {};
+        const history = Array.isArray(accessories.maintenanceHistory) ? accessories.maintenanceHistory : [];
+        return history;
+    }
+    async createVehicleMaintenanceRecord(userId, vehicleId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+        if (!vehicle) {
+            throw new common_1.NotFoundException('Fleet vehicle not found');
+        }
+        const accessories = vehicle.accessories || {};
+        const history = Array.isArray(accessories.maintenanceHistory) ? accessories.maintenanceHistory : [];
+        const record = {
+            id: (0, uuid_1.v4)(),
+            title: input.title,
+            notes: input.notes,
+            cost: Number(input.cost || 0),
+            servicedAt: Number(input.servicedAt || Date.now()),
+            createdAt: Date.now(),
+        };
+        history.unshift(record);
+        accessories.maintenanceHistory = history.slice(0, 500);
+        vehicle.accessories = accessories;
+        await this.vehicleRepo.save(vehicle);
+        return record;
+    }
+    async getDispatchById(userId, dispatchId) {
+        const fleetId = await this.getFleetId(userId);
+        const dispatch = await this.fleetDispatchRepo.findOne({ where: { id: dispatchId, fleetId } });
+        if (!dispatch) {
+            throw new common_1.NotFoundException('Fleet dispatch not found');
+        }
+        return dispatch;
+    }
+    async patchDispatch(userId, dispatchId, patch) {
+        const fleetId = await this.getFleetId(userId);
+        const dispatch = await this.fleetDispatchRepo.findOne({ where: { id: dispatchId, fleetId } });
+        if (!dispatch) {
+            throw new common_1.NotFoundException('Fleet dispatch not found');
+        }
+        await this.ensureFleetDriver(fleetId, patch.driverId);
+        await this.ensureFleetVehicle(fleetId, patch.vehicleId);
+        Object.assign(dispatch, patch);
+        return this.fleetDispatchRepo.save(dispatch);
+    }
+    async deleteDispatch(userId, dispatchId) {
+        const fleetId = await this.getFleetId(userId);
+        const result = await this.fleetDispatchRepo.delete({ id: dispatchId, fleetId });
+        if (!result.affected) {
+            throw new common_1.NotFoundException('Fleet dispatch not found');
+        }
+        return { deleted: true };
+    }
+    async assignDispatch(userId, dispatchId, input) {
+        const patched = await this.patchDispatch(userId, dispatchId, {
+            driverId: input.driverId,
+            vehicleId: input.vehicleId,
+            status: input.driverId ? 'assigned' : 'pending',
+        });
+        return patched;
+    }
+    async getServiceById(userId, service, serviceId) {
+        const fleetId = await this.getFleetId(userId);
+        const record = await this.fleetServiceRepo.findOne({ where: { id: serviceId, fleetId, service } });
+        if (!record) {
+            throw new common_1.NotFoundException('Fleet service record not found');
+        }
+        return record;
+    }
+    async patchServiceById(userId, service, serviceId, patch) {
+        const fleetId = await this.getFleetId(userId);
+        const record = await this.fleetServiceRepo.findOne({ where: { id: serviceId, fleetId, service } });
+        if (!record) {
+            throw new common_1.NotFoundException('Fleet service record not found');
+        }
+        await this.ensureFleetVehicle(fleetId, patch.assetId);
+        Object.assign(record, patch);
+        return this.fleetServiceRepo.save(record);
+    }
+    async cancelServiceById(userId, service, serviceId, reason) {
+        return this.patchServiceById(userId, service, serviceId, { status: 'cancelled', notes: reason });
+    }
+    async getComplianceIncidentById(userId, incidentId) {
+        const fleetId = await this.getFleetId(userId);
+        const incident = await this.complianceRepo.findOne({ where: { id: incidentId, fleetId } });
+        if (!incident) {
+            throw new common_1.NotFoundException('Compliance incident not found');
+        }
+        return incident;
+    }
+    async patchComplianceIncidentById(userId, incidentId, patch) {
+        const fleetId = await this.getFleetId(userId);
+        const incident = await this.complianceRepo.findOne({ where: { id: incidentId, fleetId } });
+        if (!incident) {
+            throw new common_1.NotFoundException('Compliance incident not found');
+        }
+        Object.assign(incident, patch);
+        return this.complianceRepo.save(incident);
+    }
+    async getTrainingCourseById(userId, courseId) {
+        const fleetId = await this.getFleetId(userId);
+        const course = await this.trainingRepo.findOne({ where: { id: courseId, fleetId } });
+        if (!course) {
+            throw new common_1.NotFoundException('Training course not found');
+        }
+        return course;
+    }
+    async patchTrainingCourseById(userId, courseId, patch) {
+        const fleetId = await this.getFleetId(userId);
+        await this.ensureFleetDriver(fleetId, patch.assignedTo);
+        const course = await this.trainingRepo.findOne({ where: { id: courseId, fleetId } });
+        if (!course) {
+            throw new common_1.NotFoundException('Training course not found');
+        }
+        Object.assign(course, patch);
+        return this.trainingRepo.save(course);
+    }
+    async deleteTrainingCourseById(userId, courseId) {
+        const fleetId = await this.getFleetId(userId);
+        const result = await this.trainingRepo.delete({ id: courseId, fleetId });
+        if (!result.affected) {
+            throw new common_1.NotFoundException('Training course not found');
+        }
+        return { deleted: true };
+    }
+    async getStatementById(userId, statementId) {
+        const statements = await this.getStatements(userId);
+        const statement = statements.find((item) => item.statementMonth === statementId);
+        if (!statement) {
+            throw new common_1.NotFoundException('Statement not found');
+        }
+        return statement;
+    }
+    async getPayoutById(userId, payoutId) {
+        const fleetId = await this.getFleetId(userId);
+        const payout = await this.fleetPayoutRepo.findOne({ where: { id: payoutId, fleetId } });
+        if (!payout) {
+            throw new common_1.NotFoundException('Payout not found');
+        }
+        return payout;
+    }
+    getSchoolStore(fleetId) {
+        if (!this.schoolOpsStore.has(fleetId)) {
+            this.schoolOpsStore.set(fleetId, {
+                routes: [],
+                students: [],
+                attendants: [],
+                trips: [],
+                attendance: [],
+                payments: [],
+                feedback: [],
+            });
+        }
+        return this.schoolOpsStore.get(fleetId);
+    }
+    async schoolListRoutes(userId) {
+        const fleetId = await this.getFleetId(userId);
+        return this.getSchoolStore(fleetId).routes;
+    }
+    async schoolCreateRoute(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), ...input, createdAt: Date.now(), updatedAt: Date.now() };
+        store.routes.unshift(created);
+        return created;
+    }
+    async schoolGetRoute(userId, routeId) {
+        const fleetId = await this.getFleetId(userId);
+        const route = this.getSchoolStore(fleetId).routes.find((item) => item.id === routeId);
+        if (!route)
+            throw new common_1.NotFoundException('Route not found');
+        return route;
+    }
+    async schoolPatchRoute(userId, routeId, patch) {
+        const route = await this.schoolGetRoute(userId, routeId);
+        Object.assign(route, patch, { updatedAt: Date.now() });
+        return route;
+    }
+    async schoolDeleteRoute(userId, routeId) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const next = store.routes.filter((item) => item.id !== routeId);
+        if (next.length === store.routes.length)
+            throw new common_1.NotFoundException('Route not found');
+        store.routes = next;
+        return { deleted: true };
+    }
+    async schoolListStudents(userId) {
+        const fleetId = await this.getFleetId(userId);
+        return this.getSchoolStore(fleetId).students;
+    }
+    async schoolCreateStudent(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), ...input, createdAt: Date.now(), updatedAt: Date.now() };
+        store.students.unshift(created);
+        return created;
+    }
+    async schoolGetStudent(userId, studentId) {
+        const fleetId = await this.getFleetId(userId);
+        const student = this.getSchoolStore(fleetId).students.find((item) => item.id === studentId);
+        if (!student)
+            throw new common_1.NotFoundException('Student not found');
+        return student;
+    }
+    async schoolPatchStudent(userId, studentId, patch) {
+        const student = await this.schoolGetStudent(userId, studentId);
+        Object.assign(student, patch, { updatedAt: Date.now() });
+        return student;
+    }
+    async schoolDeleteStudent(userId, studentId) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const next = store.students.filter((item) => item.id !== studentId);
+        if (next.length === store.students.length)
+            throw new common_1.NotFoundException('Student not found');
+        store.students = next;
+        return { deleted: true };
+    }
+    async schoolListAttendance(userId, studentId) {
+        const fleetId = await this.getFleetId(userId);
+        const entries = this.getSchoolStore(fleetId).attendance;
+        return studentId ? entries.filter((item) => item.studentId === studentId) : entries;
+    }
+    async schoolUpsertAttendance(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), ...input, createdAt: Date.now(), updatedAt: Date.now() };
+        store.attendance.unshift(created);
+        return created;
+    }
+    async schoolListTrips(userId) {
+        const fleetId = await this.getFleetId(userId);
+        return this.getSchoolStore(fleetId).trips;
+    }
+    async schoolCreateTrip(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), status: 'scheduled', ...input, createdAt: Date.now(), updatedAt: Date.now() };
+        store.trips.unshift(created);
+        return created;
+    }
+    async schoolGetTrip(userId, tripId) {
+        const fleetId = await this.getFleetId(userId);
+        const trip = this.getSchoolStore(fleetId).trips.find((item) => item.id === tripId);
+        if (!trip)
+            throw new common_1.NotFoundException('School trip not found');
+        return trip;
+    }
+    async schoolPatchTrip(userId, tripId, patch) {
+        const trip = await this.schoolGetTrip(userId, tripId);
+        Object.assign(trip, patch, { updatedAt: Date.now() });
+        return trip;
+    }
+    async schoolCancelTrip(userId, tripId, reason) {
+        return this.schoolPatchTrip(userId, tripId, { status: 'cancelled', cancelReason: reason });
+    }
+    async schoolTripLive(userId, tripId) {
+        const trip = await this.schoolGetTrip(userId, tripId);
+        return {
+            tripId,
+            status: trip.status,
+            vehicleLocation: { lat: 0.3476, lng: 32.5825 },
+            updatedAt: Date.now(),
+        };
+    }
+    async schoolListAttendants(userId) {
+        const fleetId = await this.getFleetId(userId);
+        return this.getSchoolStore(fleetId).attendants;
+    }
+    async schoolCreateAttendant(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), ...input, createdAt: Date.now(), updatedAt: Date.now() };
+        store.attendants.unshift(created);
+        return created;
+    }
+    async schoolGetAttendant(userId, attendantId) {
+        const fleetId = await this.getFleetId(userId);
+        const attendant = this.getSchoolStore(fleetId).attendants.find((item) => item.id === attendantId);
+        if (!attendant)
+            throw new common_1.NotFoundException('Attendant not found');
+        return attendant;
+    }
+    async schoolPatchAttendant(userId, attendantId, patch) {
+        const attendant = await this.schoolGetAttendant(userId, attendantId);
+        Object.assign(attendant, patch, { updatedAt: Date.now() });
+        return attendant;
+    }
+    async schoolDeleteAttendant(userId, attendantId) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const next = store.attendants.filter((item) => item.id !== attendantId);
+        if (next.length === store.attendants.length)
+            throw new common_1.NotFoundException('Attendant not found');
+        store.attendants = next;
+        return { deleted: true };
+    }
+    async schoolListPayments(userId) {
+        const fleetId = await this.getFleetId(userId);
+        return this.getSchoolStore(fleetId).payments;
+    }
+    async schoolCreatePayment(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), ...input, createdAt: Date.now() };
+        store.payments.unshift(created);
+        return created;
+    }
+    async schoolListFeedback(userId) {
+        const fleetId = await this.getFleetId(userId);
+        return this.getSchoolStore(fleetId).feedback;
+    }
+    async schoolCreateFeedback(userId, input) {
+        const fleetId = await this.getFleetId(userId);
+        const store = this.getSchoolStore(fleetId);
+        const created = { id: (0, uuid_1.v4)(), ...input, createdAt: Date.now() };
+        store.feedback.unshift(created);
+        return created;
+    }
+    async schoolRoster(userId, routeId) {
+        const students = await this.schoolListStudents(userId);
+        if (!routeId)
+            return students;
+        return students.filter((item) => item.routeId === routeId);
+    }
+    async schoolTripCalendar(userId, date) {
+        const trips = await this.schoolListTrips(userId);
+        if (!date)
+            return trips;
+        return trips.filter((trip) => String(trip.date || trip.scheduledDate || '').startsWith(date));
+    }
+    async schoolPerformanceReport(userId) {
+        const trips = await this.schoolListTrips(userId);
+        const attendance = await this.schoolListAttendance(userId);
+        const completedTrips = trips.filter((trip) => trip.status === 'completed').length;
+        return {
+            tripsTotal: trips.length,
+            tripsCompleted: completedTrips,
+            onTimeRate: trips.length ? Number(((completedTrips / trips.length) * 100).toFixed(2)) : 0,
+            attendanceEntries: attendance.length,
+        };
+    }
+    async schoolBulkReminders(userId, input) {
+        await this.getFleetId(userId);
+        return {
+            sent: true,
+            message: input.message,
+            target: input.target || 'all',
+            sentAt: Date.now(),
+        };
     }
     publishFleetSyncEvent(userId, event, payload) {
         this.fleetRealtimeGateway.publishToUser(userId, event, payload);

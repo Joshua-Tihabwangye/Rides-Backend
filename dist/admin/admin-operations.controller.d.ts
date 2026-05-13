@@ -75,4 +75,82 @@ export declare class AdminOperationsController {
         createdAt: number;
         updatedAt: number;
     }>>;
+    listAgents(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+        status: "active" | "inactive";
+        region?: string;
+        metadata?: Record<string, unknown>;
+        createdAt: number;
+        updatedAt: number;
+    }[]>>;
+    getAgent(agentId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+        status: "active" | "inactive";
+        region?: string;
+        metadata?: Record<string, unknown>;
+        createdAt: number;
+        updatedAt: number;
+    }>>;
+    createAgent(user: AuthenticatedUser, body: {
+        name: string;
+        email: string;
+        role: string;
+        region?: string;
+        status?: 'active' | 'inactive';
+        metadata?: Record<string, unknown>;
+    }, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+        status: "active" | "inactive";
+        region: string | undefined;
+        metadata: Record<string, unknown> | undefined;
+        createdAt: number;
+        updatedAt: number;
+    }>>;
+    patchAgent(user: AuthenticatedUser, agentId: string, body: Partial<{
+        name: string;
+        email: string;
+        role: string;
+        region: string;
+        status: 'active' | 'inactive';
+        metadata: Record<string, unknown>;
+    }>, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        updatedAt: number;
+        name: string;
+        email: string;
+        role: string;
+        region?: string;
+        status: "active" | "inactive";
+        metadata?: Record<string, unknown>;
+        id: string;
+        createdAt: number;
+    }>>;
+    deleteAgent(user: AuthenticatedUser, agentId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        deleted: boolean;
+    }>>;
+    search(query: string | undefined, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        query: string;
+        totals: {
+            users: number;
+            riders: number;
+            drivers: number;
+            companies: number;
+            trips: number;
+        };
+        results: {
+            users: import("../entities/user.entity").User[];
+            riders: import("../entities/rider-profile.entity").RiderProfile[];
+            drivers: import("../entities/driver-profile.entity").DriverProfile[];
+            companies: import("../entities/fleet-partner-profile.entity").FleetPartnerProfile[];
+            trips: import("../entities/trip.entity").Trip[];
+        };
+    }>>;
 }

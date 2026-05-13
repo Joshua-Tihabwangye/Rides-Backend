@@ -87,6 +87,85 @@ export declare class RiderController {
         createdAt: number;
         relatedTripId: string | undefined;
     }[]>>;
+    listPaymentMethods(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        type: string;
+        label: string;
+        enabled: boolean;
+        isDefault: boolean;
+    }[]>>;
+    createPaymentIntent(user: AuthenticatedUser, body: {
+        amount: number;
+        currency?: string;
+        serviceType?: string;
+        referenceId?: string;
+        methodId?: string;
+    }, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        userId: string;
+        amount: number;
+        currency: string;
+        methodId: string;
+        serviceType: string;
+        referenceId: string | undefined;
+        status: string;
+        createdAt: number;
+    }>>;
+    verifyPaymentIntent(user: AuthenticatedUser, intentId: string, body: {
+        verificationCode?: string;
+    }, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<Record<string, unknown>>>;
+    listEligiblePromos(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        code: string;
+        description: string;
+        discountType: string;
+        discountValue: number;
+    }[]>>;
+    applyPromo(user: AuthenticatedUser, body: {
+        code: string;
+        orderAmount?: number;
+    }, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        code: string;
+        applied: boolean;
+        discountAmount: number;
+        currency: string;
+        finalAmount: number;
+    }>>;
+    listCommutes(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<Record<string, unknown>[]>>;
+    createCommute(user: AuthenticatedUser, body: {
+        name?: string;
+        pickupAddress: string;
+        dropoffAddress: string;
+        schedule?: Record<string, unknown>;
+    }, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        name: string;
+        pickupAddress: string;
+        dropoffAddress: string;
+        schedule: Record<string, unknown>;
+        active: boolean;
+        createdAt: number;
+        updatedAt: number;
+    }>>;
+    patchCommute(user: AuthenticatedUser, commuteId: string, body: Record<string, unknown>, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<Record<string, unknown>>>;
+    deleteCommute(user: AuthenticatedUser, commuteId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        deleted: boolean;
+    }>>;
+    createWalletTransfer(user: AuthenticatedUser, body: {
+        amount: number;
+        destination: string;
+        method?: string;
+        note?: string;
+    }, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        amount: number;
+        currency: string;
+        destination: string;
+        method: string;
+        note: string | undefined;
+        status: string;
+        createdAt: number;
+    }>>;
+    listWalletTransfers(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<Record<string, unknown>[]>>;
     listTripHistory(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/trip.entity").Trip[]>>;
     getActiveTrip(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/trip.entity").Trip | null>>;
     getTripById(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/trip.entity").Trip>>;

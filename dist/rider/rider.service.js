@@ -41,6 +41,8 @@ let RiderService = class RiderService {
         this.presenceLocationService = presenceLocationService;
         this.realtimeGateway = realtimeGateway;
         this.riderRealtimeGateway = riderRealtimeGateway;
+        this.commuteStore = new Map();
+        this.paymentIntentStore = new Map();
     }
     async getProfile(userId) {
         const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -222,6 +224,135 @@ let RiderService = class RiderService {
             createdAt: new Date(event.createdAt).getTime(),
             relatedTripId: event.tripId || event.deliveryOrderId || undefined,
         }));
+    }
+    async listPaymentMethods(userId) {
+        await this.getProfile(userId);
+        return [
+            { id: 'wallet', type: 'wallet', label: 'EVzone Wallet', enabled: true, isDefault: true },
+            { id: 'mobile_money', type: 'mobile_money', label: 'Mobile Money', enabled: true, isDefault: false },
+            { id: 'card', type: 'card', label: 'Bank Card', enabled: true, isDefault: false },
+        ];
+    }
+    async createPaymentIntent(userId, input) {
+        const intent = {
+            id: (0, crypto_1.randomUUID)(),
+            userId,
+            amount: Number(input.amount || 0),
+            currency: input.currency || 'UGX',
+            methodId: input.methodId || 'wallet',
+            serviceType: input.serviceType || 'ride',
+            referenceId: input.referenceId,
+            status: 'pending',
+            createdAt: Date.now(),
+        };
+        const intents = this.paymentIntentStore.get(userId) ?? [];
+        intents.unshift(intent);
+        this.paymentIntentStore.set(userId, intents.slice(0, 200));
+        return intent;
+    }
+    async verifyPaymentIntent(userId, intentId, input) {
+        void input;
+        const intents = this.paymentIntentStore.get(userId) ?? [];
+        const target = intents.find((intent) => intent.id === intentId);
+        if (!target) {
+            throw new common_1.NotFoundException('Payment intent not found');
+        }
+        target.status = 'verified';
+        target.verifiedAt = Date.now();
+        return target;
+    }
+    async listEligiblePromos(userId) {
+        await this.getProfile(userId);
+        return [
+            { code: 'RIDE10', description: '10% off rides', discountType: 'percent', discountValue: 10 },
+            { code: 'WELCOME5', description: 'Flat 5,000 UGX off', discountType: 'flat', discountValue: 5000 },
+        ];
+    }
+    async applyPromo(userId, input) {
+        await this.getProfile(userId);
+        const upperCode = String(input.code || '').trim().toUpperCase();
+        if (!upperCode) {
+            throw new common_1.NotFoundException('Promo code is required');
+        }
+        const orderAmount = Number(input.orderAmount || 0);
+        const discount = upperCode === 'RIDE10' ? Math.round(orderAmount * 0.1) : 5000;
+        return {
+            code: upperCode,
+            applied: true,
+            discountAmount: discount,
+            currency: 'UGX',
+            finalAmount: Math.max(0, orderAmount - discount),
+        };
+    }
+    async listCommutes(userId) {
+        await this.getProfile(userId);
+        return this.commuteStore.get(userId) ?? [];
+    }
+    async createCommute(userId, input) {
+        const commute = {
+            id: (0, crypto_1.randomUUID)(),
+            name: input.name || 'Saved commute',
+            pickupAddress: input.pickupAddress,
+            dropoffAddress: input.dropoffAddress,
+            schedule: input.schedule || {},
+            active: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        };
+        const commutes = this.commuteStore.get(userId) ?? [];
+        commutes.unshift(commute);
+        this.commuteStore.set(userId, commutes.slice(0, 200));
+        return commute;
+    }
+    async patchCommute(userId, commuteId, patch) {
+        const commutes = this.commuteStore.get(userId) ?? [];
+        const target = commutes.find((commute) => commute.id === commuteId);
+        if (!target) {
+            throw new common_1.NotFoundException('Commute not found');
+        }
+        Object.assign(target, patch, { updatedAt: Date.now() });
+        return target;
+    }
+    async deleteCommute(userId, commuteId) {
+        const commutes = this.commuteStore.get(userId) ?? [];
+        const filtered = commutes.filter((commute) => commute.id !== commuteId);
+        if (filtered.length === commutes.length) {
+            throw new common_1.NotFoundException('Commute not found');
+        }
+        this.commuteStore.set(userId, filtered);
+        return { deleted: true };
+    }
+    async createWalletTransfer(userId, input) {
+        const wallet = await this.getWallet(userId);
+        const transfer = {
+            id: (0, crypto_1.randomUUID)(),
+            amount: Number(input.amount || 0),
+            currency: wallet.currency,
+            destination: input.destination,
+            method: input.method || 'wallet_transfer',
+            note: input.note,
+            status: 'completed',
+            createdAt: Date.now(),
+        };
+        const intents = this.paymentIntentStore.get(userId) ?? [];
+        intents.unshift({
+            id: transfer.id,
+            userId,
+            amount: transfer.amount,
+            currency: transfer.currency,
+            methodId: transfer.method,
+            serviceType: 'wallet_transfer',
+            status: transfer.status,
+            createdAt: transfer.createdAt,
+            destination: transfer.destination,
+            note: transfer.note,
+        });
+        this.paymentIntentStore.set(userId, intents.slice(0, 200));
+        return transfer;
+    }
+    async listWalletTransfers(userId) {
+        const intents = this.paymentIntentStore.get(userId) ?? [];
+        return intents.filter((intent) => intent.serviceType === 'wallet_transfer');
     }
     async listRentals(userId) {
         const records = await this.riderServiceRequestRepo.find({

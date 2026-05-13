@@ -83,6 +83,11 @@ let VehiclesService = class VehiclesService {
         await this.vehicleRepo.remove(vehicle);
         return { deleted: true };
     }
+    async removeFleet(fleetId, vehicleId) {
+        const vehicle = await this.findFleetVehicleById(fleetId, vehicleId);
+        await this.vehicleRepo.remove(vehicle);
+        return { deleted: true };
+    }
     async patchAccessories(driverId, vehicleId, accessories) {
         const vehicle = await this.findById(driverId, vehicleId);
         vehicle.accessories = accessories;

@@ -32,6 +32,7 @@ export declare class FleetService {
     private vehicleRepo;
     private riderServiceRequestRepo;
     private readonly fleetRealtimeGateway;
+    private readonly schoolOpsStore;
     constructor(fleetProfileRepo: Repository<FleetPartnerProfile>, fleetBranchRepo: Repository<FleetBranch>, fleetDriverRepo: Repository<FleetDriver>, fleetDispatchRepo: Repository<FleetDispatch>, fleetServiceRepo: Repository<FleetServiceRecord>, fleetPayoutRepo: Repository<FleetPayout>, complianceRepo: Repository<FleetComplianceIncident>, trainingRepo: Repository<FleetTrainingCourse>, userRepo: Repository<User>, driverProfileRepo: Repository<DriverProfile>, tripRepo: Repository<Trip>, jobOfferRepo: Repository<JobOffer>, earningsLedgerRepo: Repository<EarningsLedger>, vehicleRepo: Repository<Vehicle>, riderServiceRequestRepo: Repository<RiderServiceRequest>, fleetRealtimeGateway: FleetRealtimeGateway);
     getProfile(userId: string): Promise<FleetPartnerProfile>;
     updateProfile(userId: string, patch: Partial<{
@@ -139,6 +140,169 @@ export declare class FleetService {
         createdAt: number;
         updatedAt: number;
     }[]>;
+    getBranchById(userId: string, branchId: string): Promise<FleetBranch>;
+    getDriverById(userId: string, driverId: string): Promise<FleetDriver>;
+    deleteDriver(userId: string, driverId: string): Promise<{
+        deleted: boolean;
+    }>;
+    removeVehicle(userId: string, vehicleId: string): Promise<{
+        deleted: boolean;
+    }>;
+    listVehicleDocuments(userId: string, vehicleId: string): Promise<{
+        documentType: string;
+    }[]>;
+    createVehicleDocument(userId: string, vehicleId: string, input: {
+        documentType: string;
+        fileUrl: string;
+        expiryDate?: string;
+    }): Promise<any>;
+    listVehicleMaintenanceHistory(userId: string, vehicleId: string): Promise<any[]>;
+    createVehicleMaintenanceRecord(userId: string, vehicleId: string, input: {
+        title: string;
+        notes?: string;
+        cost?: number;
+        servicedAt?: number;
+    }): Promise<{
+        id: string;
+        title: string;
+        notes: string | undefined;
+        cost: number;
+        servicedAt: number;
+        createdAt: number;
+    }>;
+    getDispatchById(userId: string, dispatchId: string): Promise<FleetDispatch>;
+    patchDispatch(userId: string, dispatchId: string, patch: Partial<{
+        pickup: string;
+        dropoff: string;
+        notes: string;
+        status: string;
+        driverId: string;
+        vehicleId: string;
+    }>): Promise<FleetDispatch>;
+    deleteDispatch(userId: string, dispatchId: string): Promise<{
+        deleted: boolean;
+    }>;
+    assignDispatch(userId: string, dispatchId: string, input: {
+        driverId?: string;
+        vehicleId?: string;
+    }): Promise<FleetDispatch>;
+    getServiceById(userId: string, service: string, serviceId: string): Promise<FleetServiceRecord>;
+    patchServiceById(userId: string, service: string, serviceId: string, patch: Partial<{
+        customerName: string;
+        assetId: string;
+        scheduledAt: number;
+        notes: string;
+        status: string;
+    }>): Promise<FleetServiceRecord>;
+    cancelServiceById(userId: string, service: string, serviceId: string, reason?: string): Promise<FleetServiceRecord>;
+    getComplianceIncidentById(userId: string, incidentId: string): Promise<FleetComplianceIncident>;
+    patchComplianceIncidentById(userId: string, incidentId: string, patch: Partial<{
+        category: string;
+        severity: string;
+        status: string;
+        description: string;
+    }>): Promise<FleetComplianceIncident>;
+    getTrainingCourseById(userId: string, courseId: string): Promise<FleetTrainingCourse>;
+    patchTrainingCourseById(userId: string, courseId: string, patch: Partial<{
+        title: string;
+        status: string;
+        assignedTo?: string;
+    }>): Promise<FleetTrainingCourse>;
+    deleteTrainingCourseById(userId: string, courseId: string): Promise<{
+        deleted: boolean;
+    }>;
+    getStatementById(userId: string, statementId: string): Promise<{
+        statementMonth: string;
+        total: number;
+        currency: string;
+    }>;
+    getPayoutById(userId: string, payoutId: string): Promise<FleetPayout>;
+    private getSchoolStore;
+    schoolListRoutes(userId: string): Promise<Record<string, unknown>[]>;
+    schoolCreateRoute(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        updatedAt: number;
+        id: string;
+    }>;
+    schoolGetRoute(userId: string, routeId: string): Promise<Record<string, unknown>>;
+    schoolPatchRoute(userId: string, routeId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>;
+    schoolDeleteRoute(userId: string, routeId: string): Promise<{
+        deleted: boolean;
+    }>;
+    schoolListStudents(userId: string): Promise<Record<string, unknown>[]>;
+    schoolCreateStudent(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        updatedAt: number;
+        id: string;
+    }>;
+    schoolGetStudent(userId: string, studentId: string): Promise<Record<string, unknown>>;
+    schoolPatchStudent(userId: string, studentId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>;
+    schoolDeleteStudent(userId: string, studentId: string): Promise<{
+        deleted: boolean;
+    }>;
+    schoolListAttendance(userId: string, studentId?: string): Promise<Record<string, unknown>[]>;
+    schoolUpsertAttendance(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        updatedAt: number;
+        id: string;
+    }>;
+    schoolListTrips(userId: string): Promise<Record<string, unknown>[]>;
+    schoolCreateTrip(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        updatedAt: number;
+        id: string;
+        status: string;
+    }>;
+    schoolGetTrip(userId: string, tripId: string): Promise<Record<string, unknown>>;
+    schoolPatchTrip(userId: string, tripId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>;
+    schoolCancelTrip(userId: string, tripId: string, reason?: string): Promise<Record<string, unknown>>;
+    schoolTripLive(userId: string, tripId: string): Promise<{
+        tripId: string;
+        status: unknown;
+        vehicleLocation: {
+            lat: number;
+            lng: number;
+        };
+        updatedAt: number;
+    }>;
+    schoolListAttendants(userId: string): Promise<Record<string, unknown>[]>;
+    schoolCreateAttendant(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        updatedAt: number;
+        id: string;
+    }>;
+    schoolGetAttendant(userId: string, attendantId: string): Promise<Record<string, unknown>>;
+    schoolPatchAttendant(userId: string, attendantId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>;
+    schoolDeleteAttendant(userId: string, attendantId: string): Promise<{
+        deleted: boolean;
+    }>;
+    schoolListPayments(userId: string): Promise<Record<string, unknown>[]>;
+    schoolCreatePayment(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        id: string;
+    }>;
+    schoolListFeedback(userId: string): Promise<Record<string, unknown>[]>;
+    schoolCreateFeedback(userId: string, input: Record<string, unknown>): Promise<{
+        createdAt: number;
+        id: string;
+    }>;
+    schoolRoster(userId: string, routeId?: string): Promise<Record<string, unknown>[]>;
+    schoolTripCalendar(userId: string, date?: string): Promise<Record<string, unknown>[]>;
+    schoolPerformanceReport(userId: string): Promise<{
+        tripsTotal: number;
+        tripsCompleted: number;
+        onTimeRate: number;
+        attendanceEntries: number;
+    }>;
+    schoolBulkReminders(userId: string, input: {
+        message: string;
+        target?: string;
+    }): Promise<{
+        sent: boolean;
+        message: string;
+        target: string;
+        sentAt: number;
+    }>;
     private publishFleetSyncEvent;
     private getFleetId;
     private ensureBranchBelongsToFleet;

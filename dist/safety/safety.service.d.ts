@@ -6,6 +6,8 @@ export declare class SafetyService {
     private safetyEventRepo;
     private emergencyContactRepo;
     private driverProfileRepo;
+    private readonly shareContactsStore;
+    private readonly trainingModuleStore;
     constructor(safetyEventRepo: Repository<SafetyEvent>, emergencyContactRepo: Repository<EmergencyContact>, driverProfileRepo: Repository<DriverProfile>);
     requestTemporaryStop(driverId: string, tripId: string, note?: string): Promise<SafetyEvent>;
     respondTemporaryStop(driverId: string, tripId: string, decision: 'confirm' | 'decline'): Promise<SafetyEvent>;
@@ -85,4 +87,43 @@ export declare class SafetyService {
     deleteEmergencyContact(driverId: string, contactId: string): Promise<{
         deleted: boolean;
     }>;
+    listTripShareContacts(driverId: string, tripId: string): Promise<Record<string, unknown>[]>;
+    addTripShareContact(driverId: string, tripId: string, input: {
+        name: string;
+        phone: string;
+        relationship?: string;
+    }): Promise<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        name: string;
+        phone: string;
+        relationship: string | undefined;
+        createdAt: number;
+    }>;
+    deleteTripShareContact(driverId: string, tripId: string, contactId: string): Promise<{
+        deleted: boolean;
+    }>;
+    createTripShareLink(driverId: string, tripId: string): Promise<{
+        tripId: string;
+        shareUrl: string;
+        createdAt: number;
+        expiresAt: number;
+        driverId: string;
+    }>;
+    getTripShareStatus(driverId: string, tripId: string): Promise<{
+        tripId: string;
+        contactsCount: number;
+        sharingEnabled: boolean;
+        lastUpdatedAt: number;
+    }>;
+    listTrainingModules(driverId: string): Promise<Record<string, unknown>[]>;
+    getTrainingModule(driverId: string, moduleId: string): Promise<Record<string, unknown>>;
+    createTrainingAttempt(driverId: string, moduleId: string, input: {
+        answers?: Record<string, unknown>;
+    }): Promise<{
+        moduleId: string;
+        score: number;
+        passed: boolean;
+        attemptedAt: number;
+    }>;
+    completeTrainingModule(driverId: string, moduleId: string): Promise<Record<string, unknown>>;
 }

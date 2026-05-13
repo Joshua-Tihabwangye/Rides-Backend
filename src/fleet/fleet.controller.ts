@@ -52,6 +52,20 @@ export class FleetController {
     });
   }
 
+  @Get('branches/:branchId')
+  async getBranchById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('branchId') branchId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'FLEET_BRANCH_FETCHED',
+      message: 'Fleet branch fetched',
+      requestId: getRequestId(req),
+      data: await this.fleetService.getBranchById(user.userId, branchId),
+    });
+  }
+
   @Post('branches')
   async createBranch(
     @CurrentUser() user: AuthenticatedUser,

@@ -17,6 +17,9 @@ import { RiderServiceRequest } from '../entities/rider-service-request.entity';
 
 @Injectable()
 export class RiderService {
+  private readonly commuteStore = new Map<string, Array<Record<string, unknown>>>();
+  private readonly paymentIntentStore = new Map<string, Array<Record<string, unknown>>>();
+
   constructor(
     @InjectRepository(RiderProfile) private riderProfileRepo: Repository<RiderProfile>,
     @InjectRepository(Trip) private tripRepo: Repository<Trip>,
@@ -240,6 +243,157 @@ export class RiderService {
       createdAt: new Date(event.createdAt).getTime(),
       relatedTripId: event.tripId || event.deliveryOrderId || undefined,
     }));
+  }
+
+  async listPaymentMethods(userId: string) {
+    await this.getProfile(userId);
+    return [
+      { id: 'wallet', type: 'wallet', label: 'EVzone Wallet', enabled: true, isDefault: true },
+      { id: 'mobile_money', type: 'mobile_money', label: 'Mobile Money', enabled: true, isDefault: false },
+      { id: 'card', type: 'card', label: 'Bank Card', enabled: true, isDefault: false },
+    ];
+  }
+
+  async createPaymentIntent(
+    userId: string,
+    input: { amount: number; currency?: string; serviceType?: string; referenceId?: string; methodId?: string },
+  ) {
+    const intent = {
+      id: randomUUID(),
+      userId,
+      amount: Number(input.amount || 0),
+      currency: input.currency || 'UGX',
+      methodId: input.methodId || 'wallet',
+      serviceType: input.serviceType || 'ride',
+      referenceId: input.referenceId,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+
+    const intents = this.paymentIntentStore.get(userId) ?? [];
+    intents.unshift(intent);
+    this.paymentIntentStore.set(userId, intents.slice(0, 200));
+    return intent;
+  }
+
+  async verifyPaymentIntent(userId: string, intentId: string, input: { verificationCode?: string }) {
+    void input;
+    const intents = this.paymentIntentStore.get(userId) ?? [];
+    const target = intents.find((intent) => intent.id === intentId);
+    if (!target) {
+      throw new NotFoundException('Payment intent not found');
+    }
+    target.status = 'verified';
+    target.verifiedAt = Date.now();
+    return target;
+  }
+
+  async listEligiblePromos(userId: string) {
+    await this.getProfile(userId);
+    return [
+      { code: 'RIDE10', description: '10% off rides', discountType: 'percent', discountValue: 10 },
+      { code: 'WELCOME5', description: 'Flat 5,000 UGX off', discountType: 'flat', discountValue: 5000 },
+    ];
+  }
+
+  async applyPromo(userId: string, input: { code: string; orderAmount?: number }) {
+    await this.getProfile(userId);
+    const upperCode = String(input.code || '').trim().toUpperCase();
+    if (!upperCode) {
+      throw new NotFoundException('Promo code is required');
+    }
+    const orderAmount = Number(input.orderAmount || 0);
+    const discount = upperCode === 'RIDE10' ? Math.round(orderAmount * 0.1) : 5000;
+    return {
+      code: upperCode,
+      applied: true,
+      discountAmount: discount,
+      currency: 'UGX',
+      finalAmount: Math.max(0, orderAmount - discount),
+    };
+  }
+
+  async listCommutes(userId: string) {
+    await this.getProfile(userId);
+    return this.commuteStore.get(userId) ?? [];
+  }
+
+  async createCommute(
+    userId: string,
+    input: { name?: string; pickupAddress: string; dropoffAddress: string; schedule?: Record<string, unknown> },
+  ) {
+    const commute = {
+      id: randomUUID(),
+      name: input.name || 'Saved commute',
+      pickupAddress: input.pickupAddress,
+      dropoffAddress: input.dropoffAddress,
+      schedule: input.schedule || {},
+      active: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const commutes = this.commuteStore.get(userId) ?? [];
+    commutes.unshift(commute);
+    this.commuteStore.set(userId, commutes.slice(0, 200));
+    return commute;
+  }
+
+  async patchCommute(userId: string, commuteId: string, patch: Record<string, unknown>) {
+    const commutes = this.commuteStore.get(userId) ?? [];
+    const target = commutes.find((commute) => commute.id === commuteId);
+    if (!target) {
+      throw new NotFoundException('Commute not found');
+    }
+    Object.assign(target, patch, { updatedAt: Date.now() });
+    return target;
+  }
+
+  async deleteCommute(userId: string, commuteId: string) {
+    const commutes = this.commuteStore.get(userId) ?? [];
+    const filtered = commutes.filter((commute) => commute.id !== commuteId);
+    if (filtered.length === commutes.length) {
+      throw new NotFoundException('Commute not found');
+    }
+    this.commuteStore.set(userId, filtered);
+    return { deleted: true };
+  }
+
+  async createWalletTransfer(
+    userId: string,
+    input: { amount: number; destination: string; method?: string; note?: string },
+  ) {
+    const wallet = await this.getWallet(userId);
+    const transfer = {
+      id: randomUUID(),
+      amount: Number(input.amount || 0),
+      currency: wallet.currency,
+      destination: input.destination,
+      method: input.method || 'wallet_transfer',
+      note: input.note,
+      status: 'completed',
+      createdAt: Date.now(),
+    };
+
+    const intents = this.paymentIntentStore.get(userId) ?? [];
+    intents.unshift({
+      id: transfer.id,
+      userId,
+      amount: transfer.amount,
+      currency: transfer.currency,
+      methodId: transfer.method,
+      serviceType: 'wallet_transfer',
+      status: transfer.status,
+      createdAt: transfer.createdAt,
+      destination: transfer.destination,
+      note: transfer.note,
+    });
+    this.paymentIntentStore.set(userId, intents.slice(0, 200));
+    return transfer;
+  }
+
+  async listWalletTransfers(userId: string) {
+    const intents = this.paymentIntentStore.get(userId) ?? [];
+    return intents.filter((intent) => intent.serviceType === 'wallet_transfer');
   }
 
   async listRentals(userId: string) {

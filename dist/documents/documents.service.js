@@ -93,6 +93,16 @@ let DocumentsService = class DocumentsService {
             rejectionReason: '',
         });
     }
+    async deleteForUser(userType, userId, documentId) {
+        const doc = await this.documentRepo.findOne({
+            where: { id: documentId, userId, userType },
+        });
+        if (!doc) {
+            throw new common_1.NotFoundException('Document not found');
+        }
+        await this.documentRepo.remove(doc);
+        return { deleted: true };
+    }
     buildStatusPayload(userType, docs) {
         const indexed = new Map(docs.map((doc) => [doc.documentType, doc]));
         const requiredTypes = REQUIRED_DOCUMENT_TYPES[userType];

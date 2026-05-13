@@ -83,6 +83,12 @@ export class VehiclesService {
     return { deleted: true };
   }
 
+  async removeFleet(fleetId: string, vehicleId: string) {
+    const vehicle = await this.findFleetVehicleById(fleetId, vehicleId);
+    await this.vehicleRepo.remove(vehicle);
+    return { deleted: true };
+  }
+
   async patchAccessories(driverId: string, vehicleId: string, accessories: Record<string, any>) {
     const vehicle = await this.findById(driverId, vehicleId);
     vehicle.accessories = accessories;

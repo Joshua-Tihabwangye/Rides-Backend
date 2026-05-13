@@ -30,6 +30,9 @@ export declare class VehiclesService {
     remove(driverId: string, vehicleId: string): Promise<{
         deleted: boolean;
     }>;
+    removeFleet(fleetId: string, vehicleId: string): Promise<{
+        deleted: boolean;
+    }>;
     patchAccessories(driverId: string, vehicleId: string, accessories: Record<string, any>): Promise<Vehicle>;
     uploadDocument(driverId: string, vehicleId: string, input: {
         documentType: string;
