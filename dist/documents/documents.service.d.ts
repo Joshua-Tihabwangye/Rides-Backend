@@ -41,6 +41,9 @@ export declare class DocumentsService {
         fileUrl?: string;
         expiryDate?: string;
     }): Promise<UserDocument>;
+    deleteForUser(userType: UserType, userId: string, documentId: string): Promise<{
+        deleted: boolean;
+    }>;
     private buildStatusPayload;
     private ensureFutureDate;
     private parseDate;

@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { SafetyEvent } from '../entities/safety-event.entity';
 import { EmergencyContact } from '../entities/emergency-contact.entity';
 import { DriverProfile } from '../entities/driver-profile.entity';
 
 @Injectable()
 export class SafetyService {
+  private readonly shareContactsStore = new Map<string, Array<Record<string, unknown>>>();
+  private readonly trainingModuleStore = new Map<string, Array<Record<string, unknown>>>();
+
   constructor(
     @InjectRepository(SafetyEvent) private safetyEventRepo: Repository<SafetyEvent>,
     @InjectRepository(EmergencyContact) private emergencyContactRepo: Repository<EmergencyContact>,
@@ -194,5 +198,110 @@ export class SafetyService {
       throw new NotFoundException('Emergency contact not found');
     }
     return { deleted: true };
+  }
+
+  async listTripShareContacts(driverId: string, tripId: string) {
+    const key = `${driverId}:${tripId}`;
+    return this.shareContactsStore.get(key) ?? [];
+  }
+
+  async addTripShareContact(
+    driverId: string,
+    tripId: string,
+    input: { name: string; phone: string; relationship?: string },
+  ) {
+    const key = `${driverId}:${tripId}`;
+    const current = this.shareContactsStore.get(key) ?? [];
+    const created = {
+      id: randomUUID(),
+      name: input.name,
+      phone: input.phone,
+      relationship: input.relationship,
+      createdAt: Date.now(),
+    };
+    current.unshift(created);
+    this.shareContactsStore.set(key, current.slice(0, 50));
+    return created;
+  }
+
+  async deleteTripShareContact(driverId: string, tripId: string, contactId: string) {
+    const key = `${driverId}:${tripId}`;
+    const current = this.shareContactsStore.get(key) ?? [];
+    const filtered = current.filter((item) => item.id !== contactId);
+    if (filtered.length === current.length) {
+      throw new NotFoundException('Share contact not found');
+    }
+    this.shareContactsStore.set(key, filtered);
+    return { deleted: true };
+  }
+
+  async createTripShareLink(driverId: string, tripId: string) {
+    const token = randomUUID().replace(/-/g, '');
+    return {
+      tripId,
+      shareUrl: `https://evzone.app/follow/${tripId}?token=${token}`,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 1000 * 60 * 60 * 24,
+      driverId,
+    };
+  }
+
+  async getTripShareStatus(driverId: string, tripId: string) {
+    const contacts = await this.listTripShareContacts(driverId, tripId);
+    return {
+      tripId,
+      contactsCount: contacts.length,
+      sharingEnabled: contacts.length > 0,
+      lastUpdatedAt: Date.now(),
+    };
+  }
+
+  async listTrainingModules(driverId: string) {
+    if (!this.trainingModuleStore.has(driverId)) {
+      this.trainingModuleStore.set(driverId, [
+        {
+          id: 'safety-basics',
+          title: 'Safety Basics',
+          description: 'Core trip safety and emergency procedures.',
+          status: 'published',
+          progress: 'not_started',
+        },
+        {
+          id: 'customer-care',
+          title: 'Customer Care',
+          description: 'Passenger communication and service quality.',
+          status: 'published',
+          progress: 'not_started',
+        },
+      ]);
+    }
+    return this.trainingModuleStore.get(driverId) ?? [];
+  }
+
+  async getTrainingModule(driverId: string, moduleId: string) {
+    const modules = await this.listTrainingModules(driverId);
+    const module = modules.find((item) => item.id === moduleId);
+    if (!module) {
+      throw new NotFoundException('Training module not found');
+    }
+    return module;
+  }
+
+  async createTrainingAttempt(driverId: string, moduleId: string, input: { answers?: Record<string, unknown> }) {
+    const module = await this.getTrainingModule(driverId, moduleId);
+    const score = Number(input.answers ? Object.keys(input.answers).length * 10 : 80);
+    Object.assign(module, { progress: 'attempted', lastAttemptScore: score, lastAttemptAt: Date.now() });
+    return {
+      moduleId,
+      score,
+      passed: score >= 60,
+      attemptedAt: Date.now(),
+    };
+  }
+
+  async completeTrainingModule(driverId: string, moduleId: string) {
+    const module = await this.getTrainingModule(driverId, moduleId);
+    Object.assign(module, { progress: 'completed', completedAt: Date.now() });
+    return module;
   }
 }

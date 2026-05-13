@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiResponseService } from '../common/api/api-response.service';
 import { CurrentUser, type AuthenticatedUser } from '../common/auth/current-user.decorator';
@@ -193,6 +193,92 @@ export class AdminOperationsController {
       message: 'Rider service request fetched',
       requestId: getRequestId(req),
       data: await this.adminService.getRiderServiceRequest(requestId),
+    });
+  }
+
+  @Get('agents')
+  async listAgents(@Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'ADMIN_AGENTS_FETCHED',
+      message: 'Agents fetched',
+      requestId: getRequestId(req),
+      data: await this.adminService.listAgents(),
+    });
+  }
+
+  @Get('agents/:agentId')
+  async getAgent(@Param('agentId') agentId: string, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'ADMIN_AGENT_FETCHED',
+      message: 'Agent fetched',
+      requestId: getRequestId(req),
+      data: await this.adminService.getAgent(agentId),
+    });
+  }
+
+  @Post('agents')
+  async createAgent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { name: string; email: string; role: string; region?: string; status?: 'active' | 'inactive'; metadata?: Record<string, unknown> },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'ADMIN_AGENT_CREATED',
+      message: 'Agent created',
+      requestId: getRequestId(req),
+      data: await this.adminService.createAgent(
+        user.userId,
+        body,
+        { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+      ),
+    });
+  }
+
+  @Patch('agents/:agentId')
+  async patchAgent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('agentId') agentId: string,
+    @Body() body: Partial<{ name: string; email: string; role: string; region: string; status: 'active' | 'inactive'; metadata: Record<string, unknown> }>,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'ADMIN_AGENT_UPDATED',
+      message: 'Agent updated',
+      requestId: getRequestId(req),
+      data: await this.adminService.patchAgent(
+        user.userId,
+        agentId,
+        body,
+        { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+      ),
+    });
+  }
+
+  @Delete('agents/:agentId')
+  async deleteAgent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('agentId') agentId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'ADMIN_AGENT_DELETED',
+      message: 'Agent deleted',
+      requestId: getRequestId(req),
+      data: await this.adminService.deleteAgent(
+        user.userId,
+        agentId,
+        { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+      ),
+    });
+  }
+
+  @Get('search')
+  async search(@Query('query') query: string | undefined, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'ADMIN_SEARCH_RESULTS',
+      message: 'Admin search completed',
+      requestId: getRequestId(req),
+      data: await this.adminService.searchAdmin(query ?? ''),
     });
   }
 }

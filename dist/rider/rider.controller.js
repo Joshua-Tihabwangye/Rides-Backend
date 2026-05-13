@@ -134,6 +134,94 @@ let RiderController = class RiderController {
             data: await this.riderService.listWalletTransactions(user.userId, Number.isFinite(limit) ? limit : 20, Number.isFinite(offset) ? offset : 0),
         });
     }
+    async listPaymentMethods(user, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_PAYMENT_METHODS_FETCHED',
+            message: 'Rider payment methods fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.listPaymentMethods(user.userId),
+        });
+    }
+    async createPaymentIntent(user, body, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_PAYMENT_INTENT_CREATED',
+            message: 'Payment intent created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.createPaymentIntent(user.userId, body),
+        });
+    }
+    async verifyPaymentIntent(user, intentId, body, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_PAYMENT_INTENT_VERIFIED',
+            message: 'Payment intent verified',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.verifyPaymentIntent(user.userId, intentId, body),
+        });
+    }
+    async listEligiblePromos(user, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_PROMOS_FETCHED',
+            message: 'Eligible promos fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.listEligiblePromos(user.userId),
+        });
+    }
+    async applyPromo(user, body, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_PROMO_APPLIED',
+            message: 'Promo applied',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.applyPromo(user.userId, body),
+        });
+    }
+    async listCommutes(user, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_COMMUTES_FETCHED',
+            message: 'Saved commutes fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.listCommutes(user.userId),
+        });
+    }
+    async createCommute(user, body, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_COMMUTE_CREATED',
+            message: 'Commute created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.createCommute(user.userId, body),
+        });
+    }
+    async patchCommute(user, commuteId, body, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_COMMUTE_UPDATED',
+            message: 'Commute updated',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.patchCommute(user.userId, commuteId, body),
+        });
+    }
+    async deleteCommute(user, commuteId, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_COMMUTE_DELETED',
+            message: 'Commute deleted',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.deleteCommute(user.userId, commuteId),
+        });
+    }
+    async createWalletTransfer(user, body, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_WALLET_TRANSFER_CREATED',
+            message: 'Wallet transfer created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.createWalletTransfer(user.userId, body),
+        });
+    }
+    async listWalletTransfers(user, req) {
+        return this.apiResponse.success({
+            code: 'RIDER_WALLET_TRANSFERS_FETCHED',
+            message: 'Wallet transfers fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.riderService.listWalletTransfers(user.userId),
+        });
+    }
     async listTripHistory(user, req) {
         return this.apiResponse.success({
             code: 'RIDER_TRIP_HISTORY_FETCHED',
@@ -417,6 +505,103 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], RiderController.prototype, "listWalletTransactions", null);
+__decorate([
+    (0, common_1.Get)('payment-methods'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "listPaymentMethods", null);
+__decorate([
+    (0, common_1.Post)('payment-intents'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "createPaymentIntent", null);
+__decorate([
+    (0, common_1.Post)('payment-intents/:intentId/verify'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('intentId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "verifyPaymentIntent", null);
+__decorate([
+    (0, common_1.Get)('promos/eligible'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "listEligiblePromos", null);
+__decorate([
+    (0, common_1.Post)('promos/apply'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "applyPromo", null);
+__decorate([
+    (0, common_1.Get)('commutes'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "listCommutes", null);
+__decorate([
+    (0, common_1.Post)('commutes'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "createCommute", null);
+__decorate([
+    (0, common_1.Patch)('commutes/:commuteId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('commuteId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "patchCommute", null);
+__decorate([
+    (0, common_1.Delete)('commutes/:commuteId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('commuteId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "deleteCommute", null);
+__decorate([
+    (0, common_1.Post)('wallet/transfers'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "createWalletTransfer", null);
+__decorate([
+    (0, common_1.Get)('wallet/transfers'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], RiderController.prototype, "listWalletTransfers", null);
 __decorate([
     (0, common_1.Get)('trips/history'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

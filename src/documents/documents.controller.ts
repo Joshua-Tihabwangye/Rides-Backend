@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiResponseService } from '../common/api/api-response.service';
 import { CurrentUser, type AuthenticatedUser } from '../common/auth/current-user.decorator';
@@ -98,6 +98,23 @@ export class DocumentsController {
       message: 'Document resubmitted',
       requestId: getRequestId(req),
       data: await this.documentsService.resubmitForUser(userType as any, user.userId, documentId, body),
+    });
+  }
+
+  @Delete(':userType/me/documents/:documentId')
+  async deleteDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('userType') userTypeParam: string,
+    @Param('documentId') documentId: string,
+    @Req() req: Request,
+  ) {
+    const userType = normalizeUserTypePath(userTypeParam);
+    assertUserScopeAccess(user.roles, userType);
+    return this.apiResponse.success({
+      code: 'DOCUMENT_DELETED',
+      message: 'Document deleted',
+      requestId: getRequestId(req),
+      data: await this.documentsService.deleteForUser(userType as any, user.userId, documentId),
     });
   }
 }

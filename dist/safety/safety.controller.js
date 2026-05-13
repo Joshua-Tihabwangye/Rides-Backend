@@ -147,6 +147,78 @@ let SafetyController = class SafetyController {
             data: await this.safetyService.deleteEmergencyContact(user.driverId, contactId),
         });
     }
+    async listTripShareContacts(user, tripId, req) {
+        return this.apiResponse.success({
+            code: 'SHARE_CONTACTS_FETCHED',
+            message: 'Trip share contacts fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.listTripShareContacts(user.driverId, tripId),
+        });
+    }
+    async addTripShareContact(user, tripId, body, req) {
+        return this.apiResponse.success({
+            code: 'SHARE_CONTACT_CREATED',
+            message: 'Trip share contact created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.addTripShareContact(user.driverId, tripId, body),
+        });
+    }
+    async deleteTripShareContact(user, tripId, contactId, req) {
+        return this.apiResponse.success({
+            code: 'SHARE_CONTACT_DELETED',
+            message: 'Trip share contact deleted',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.deleteTripShareContact(user.driverId, tripId, contactId),
+        });
+    }
+    async createTripShareLink(user, tripId, req) {
+        return this.apiResponse.success({
+            code: 'SHARE_LINK_CREATED',
+            message: 'Trip share link created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.createTripShareLink(user.driverId, tripId),
+        });
+    }
+    async getTripShareStatus(user, tripId, req) {
+        return this.apiResponse.success({
+            code: 'SHARE_STATUS_FETCHED',
+            message: 'Trip share status fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.getTripShareStatus(user.driverId, tripId),
+        });
+    }
+    async listTrainingModules(user, req) {
+        return this.apiResponse.success({
+            code: 'TRAINING_MODULES_FETCHED',
+            message: 'Training modules fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.listTrainingModules(user.driverId),
+        });
+    }
+    async getTrainingModule(user, moduleId, req) {
+        return this.apiResponse.success({
+            code: 'TRAINING_MODULE_FETCHED',
+            message: 'Training module fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.getTrainingModule(user.driverId, moduleId),
+        });
+    }
+    async createTrainingAttempt(user, moduleId, body, req) {
+        return this.apiResponse.success({
+            code: 'TRAINING_ATTEMPT_CREATED',
+            message: 'Training attempt created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.createTrainingAttempt(user.driverId, moduleId, body),
+        });
+    }
+    async completeTrainingModule(user, moduleId, req) {
+        return this.apiResponse.success({
+            code: 'TRAINING_MODULE_COMPLETED',
+            message: 'Training module completed',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.safetyService.completeTrainingModule(user.driverId, moduleId),
+        });
+    }
 };
 exports.SafetyController = SafetyController;
 __decorate([
@@ -292,6 +364,89 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, Object]),
     __metadata("design:returntype", Promise)
 ], SafetyController.prototype, "deleteEmergencyContact", null);
+__decorate([
+    (0, common_1.Get)('trips/:tripId/share-contacts'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('tripId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "listTripShareContacts", null);
+__decorate([
+    (0, common_1.Post)('trips/:tripId/share-contacts'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('tripId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "addTripShareContact", null);
+__decorate([
+    (0, common_1.Delete)('trips/:tripId/share-contacts/:contactId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('tripId')),
+    __param(2, (0, common_1.Param)('contactId')),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "deleteTripShareContact", null);
+__decorate([
+    (0, common_1.Post)('trips/:tripId/share-link'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('tripId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "createTripShareLink", null);
+__decorate([
+    (0, common_1.Get)('trips/:tripId/share-status'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('tripId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "getTripShareStatus", null);
+__decorate([
+    (0, common_1.Get)('training/modules'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "listTrainingModules", null);
+__decorate([
+    (0, common_1.Get)('training/modules/:moduleId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('moduleId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "getTrainingModule", null);
+__decorate([
+    (0, common_1.Post)('training/modules/:moduleId/attempts'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('moduleId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "createTrainingAttempt", null);
+__decorate([
+    (0, common_1.Post)('training/modules/:moduleId/complete'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('moduleId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], SafetyController.prototype, "completeTrainingModule", null);
 exports.SafetyController = SafetyController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('driver'),

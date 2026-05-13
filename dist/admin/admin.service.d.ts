@@ -52,6 +52,12 @@ export declare class AdminService {
     private pricingZoneRepo;
     private riderServiceRequestRepo;
     private readonly adminRealtimeGateway;
+    private readonly agentStore;
+    private readonly taxConfigStore;
+    private readonly invoiceTemplateStore;
+    private readonly trainingModuleStore;
+    private readonly policyStore;
+    private readonly verticalPolicyStore;
     constructor(userRepo: Repository<User>, driverProfileRepo: Repository<DriverProfile>, riderProfileRepo: Repository<RiderProfile>, adminProfileRepo: Repository<AdminProfile>, roleRepo: Repository<Role>, fleetProfileRepo: Repository<FleetPartnerProfile>, fleetBranchRepo: Repository<FleetBranch>, approvalRepo: Repository<Approval>, tripRepo: Repository<Trip>, fleetDispatchRepo: Repository<FleetDispatch>, earningsLedgerRepo: Repository<EarningsLedger>, fleetPayoutRepo: Repository<FleetPayout>, walletRepo: Repository<WalletAccount>, safetyRepo: Repository<SafetyEvent>, riskRepo: Repository<RiskCase>, pricingRepo: Repository<PricingConfig>, promoRepo: Repository<Promo>, serviceConfigRepo: Repository<ServiceConfig>, auditRepo: Repository<AuditLog>, flagRepo: Repository<FeatureFlag>, pricingZoneRepo: Repository<PricingZone>, riderServiceRequestRepo: Repository<RiderServiceRequest>, adminRealtimeGateway: AdminRealtimeGateway);
     getProfile(userId: string): Promise<AdminProfile>;
     updateProfile(userId: string, patch: Partial<{
@@ -441,6 +447,260 @@ export declare class AdminService {
         enabled: boolean;
         description: string;
     }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<FeatureFlag>;
+    listAgents(): Promise<{
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+        status: "active" | "inactive";
+        region?: string;
+        metadata?: Record<string, unknown>;
+        createdAt: number;
+        updatedAt: number;
+    }[]>;
+    getAgent(agentId: string): Promise<{
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+        status: "active" | "inactive";
+        region?: string;
+        metadata?: Record<string, unknown>;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+    createAgent(actorId: string, input: {
+        name: string;
+        email: string;
+        role: string;
+        region?: string;
+        status?: 'active' | 'inactive';
+        metadata?: Record<string, unknown>;
+    }, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+        status: "active" | "inactive";
+        region: string | undefined;
+        metadata: Record<string, unknown> | undefined;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+    patchAgent(actorId: string, agentId: string, patch: Partial<{
+        name: string;
+        email: string;
+        role: string;
+        region: string;
+        status: 'active' | 'inactive';
+        metadata: Record<string, unknown>;
+    }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        updatedAt: number;
+        name: string;
+        email: string;
+        role: string;
+        region?: string;
+        status: "active" | "inactive";
+        metadata?: Record<string, unknown>;
+        id: string;
+        createdAt: number;
+    }>;
+    deleteAgent(actorId: string, agentId: string, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        deleted: boolean;
+    }>;
+    searchAdmin(query: string): Promise<{
+        query: string;
+        totals: {
+            users: number;
+            riders: number;
+            drivers: number;
+            companies: number;
+            trips: number;
+        };
+        results: {
+            users: User[];
+            riders: RiderProfile[];
+            drivers: DriverProfile[];
+            companies: FleetPartnerProfile[];
+            trips: Trip[];
+        };
+    }>;
+    getTaxConfig(): Promise<{
+        regionId: string;
+        currency: string;
+        vatPercent: number;
+        serviceTaxPercent: number;
+        surchargePercent: number;
+        notes?: string;
+        updatedAt: number;
+    }[]>;
+    patchTaxConfig(actorId: string, regionId: string, patch: Partial<{
+        currency: string;
+        vatPercent: number;
+        serviceTaxPercent: number;
+        surchargePercent: number;
+        notes: string;
+    }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        updatedAt: number;
+        currency: string;
+        vatPercent: number;
+        serviceTaxPercent: number;
+        surchargePercent: number;
+        notes?: string;
+        regionId: string;
+    } | {
+        updatedAt: number;
+        currency: string;
+        vatPercent: number;
+        serviceTaxPercent: number;
+        surchargePercent: number;
+        notes?: string | undefined;
+        regionId: string;
+    }>;
+    getInvoiceTemplates(): Promise<{
+        id: string;
+        regionId: string;
+        templateName: string;
+        prefix: string;
+        nextNumber: number;
+        footer?: string;
+        updatedAt: number;
+    }[]>;
+    patchInvoiceTemplate(actorId: string, templateId: string, patch: Partial<{
+        regionId: string;
+        templateName: string;
+        prefix: string;
+        nextNumber: number;
+        footer: string;
+    }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        updatedAt: number;
+        regionId: string;
+        templateName: string;
+        prefix: string;
+        nextNumber: number;
+        footer?: string;
+        id: string;
+    } | {
+        updatedAt: number;
+        regionId: string;
+        templateName: string;
+        prefix: string;
+        nextNumber: number;
+        footer?: string | undefined;
+        id: string;
+    }>;
+    listTrainingModules(): Promise<{
+        id: string;
+        title: string;
+        category: string;
+        status: "draft" | "published" | "archived";
+        version: number;
+        content?: string;
+        updatedAt: number;
+        createdAt: number;
+    }[]>;
+    createTrainingModule(actorId: string, input: {
+        title: string;
+        category: string;
+        status?: 'draft' | 'published' | 'archived';
+        content?: string;
+    }, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        id: string;
+        title: string;
+        category: string;
+        status: "draft" | "published" | "archived";
+        content: string | undefined;
+        version: number;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+    patchTrainingModule(actorId: string, moduleId: string, patch: Partial<{
+        title: string;
+        category: string;
+        status: 'draft' | 'published' | 'archived';
+        content: string;
+    }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        version: number;
+        updatedAt: number;
+        title: string;
+        category: string;
+        status: "draft" | "published" | "archived";
+        content?: string;
+        id: string;
+        createdAt: number;
+    }>;
+    deleteTrainingModule(actorId: string, moduleId: string, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        deleted: boolean;
+    }>;
+    listPolicies(): Promise<{
+        id: string;
+        key: string;
+        title: string;
+        scope: "global" | "rider" | "driver" | "fleet" | "admin";
+        status: "draft" | "active" | "archived";
+        content: string;
+        version: number;
+        updatedAt: number;
+        createdAt: number;
+    }[]>;
+    createPolicy(actorId: string, input: {
+        key: string;
+        title: string;
+        scope: 'global' | 'rider' | 'driver' | 'fleet' | 'admin';
+        status?: 'draft' | 'active' | 'archived';
+        content: string;
+    }, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        id: string;
+        key: string;
+        title: string;
+        scope: "driver" | "rider" | "fleet" | "global" | "admin";
+        status: "active" | "draft" | "archived";
+        content: string;
+        version: number;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+    patchPolicy(actorId: string, policyId: string, patch: Partial<{
+        key: string;
+        title: string;
+        scope: 'global' | 'rider' | 'driver' | 'fleet' | 'admin';
+        status: 'draft' | 'active' | 'archived';
+        content: string;
+    }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        version: number;
+        updatedAt: number;
+        key: string;
+        title: string;
+        scope: "global" | "rider" | "driver" | "fleet" | "admin";
+        status: "draft" | "active" | "archived";
+        content: string;
+        id: string;
+        createdAt: number;
+    }>;
+    listVerticalPolicies(): Promise<{
+        verticalId: string;
+        name: string;
+        status: "active" | "inactive";
+        rules: Record<string, unknown>;
+        updatedAt: number;
+    }[]>;
+    patchVerticalPolicy(actorId: string, verticalId: string, patch: Partial<{
+        name: string;
+        status: 'active' | 'inactive';
+        rules: Record<string, unknown>;
+    }>, meta?: Omit<AuditMeta, 'actorId'>): Promise<{
+        updatedAt: number;
+        name: string;
+        status: "active" | "inactive";
+        rules: Record<string, unknown>;
+        verticalId: string;
+    } | {
+        updatedAt: number;
+        name: string;
+        status: "active" | "inactive";
+        rules: {};
+        verticalId: string;
+    }>;
     getHealth(): Promise<{
         status: string;
         service: string;

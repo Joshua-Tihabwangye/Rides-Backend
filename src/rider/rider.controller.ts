@@ -195,6 +195,146 @@ export class RiderController {
     });
   }
 
+  @Get('payment-methods')
+  async listPaymentMethods(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'RIDER_PAYMENT_METHODS_FETCHED',
+      message: 'Rider payment methods fetched',
+      requestId: getRequestId(req),
+      data: await this.riderService.listPaymentMethods(user.userId),
+    });
+  }
+
+  @Post('payment-intents')
+  async createPaymentIntent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { amount: number; currency?: string; serviceType?: string; referenceId?: string; methodId?: string },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_PAYMENT_INTENT_CREATED',
+      message: 'Payment intent created',
+      requestId: getRequestId(req),
+      data: await this.riderService.createPaymentIntent(user.userId, body),
+    });
+  }
+
+  @Post('payment-intents/:intentId/verify')
+  async verifyPaymentIntent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('intentId') intentId: string,
+    @Body() body: { verificationCode?: string },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_PAYMENT_INTENT_VERIFIED',
+      message: 'Payment intent verified',
+      requestId: getRequestId(req),
+      data: await this.riderService.verifyPaymentIntent(user.userId, intentId, body),
+    });
+  }
+
+  @Get('promos/eligible')
+  async listEligiblePromos(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'RIDER_PROMOS_FETCHED',
+      message: 'Eligible promos fetched',
+      requestId: getRequestId(req),
+      data: await this.riderService.listEligiblePromos(user.userId),
+    });
+  }
+
+  @Post('promos/apply')
+  async applyPromo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { code: string; orderAmount?: number },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_PROMO_APPLIED',
+      message: 'Promo applied',
+      requestId: getRequestId(req),
+      data: await this.riderService.applyPromo(user.userId, body),
+    });
+  }
+
+  @Get('commutes')
+  async listCommutes(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'RIDER_COMMUTES_FETCHED',
+      message: 'Saved commutes fetched',
+      requestId: getRequestId(req),
+      data: await this.riderService.listCommutes(user.userId),
+    });
+  }
+
+  @Post('commutes')
+  async createCommute(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { name?: string; pickupAddress: string; dropoffAddress: string; schedule?: Record<string, unknown> },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_COMMUTE_CREATED',
+      message: 'Commute created',
+      requestId: getRequestId(req),
+      data: await this.riderService.createCommute(user.userId, body),
+    });
+  }
+
+  @Patch('commutes/:commuteId')
+  async patchCommute(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commuteId') commuteId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_COMMUTE_UPDATED',
+      message: 'Commute updated',
+      requestId: getRequestId(req),
+      data: await this.riderService.patchCommute(user.userId, commuteId, body),
+    });
+  }
+
+  @Delete('commutes/:commuteId')
+  async deleteCommute(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('commuteId') commuteId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_COMMUTE_DELETED',
+      message: 'Commute deleted',
+      requestId: getRequestId(req),
+      data: await this.riderService.deleteCommute(user.userId, commuteId),
+    });
+  }
+
+  @Post('wallet/transfers')
+  async createWalletTransfer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { amount: number; destination: string; method?: string; note?: string },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'RIDER_WALLET_TRANSFER_CREATED',
+      message: 'Wallet transfer created',
+      requestId: getRequestId(req),
+      data: await this.riderService.createWalletTransfer(user.userId, body),
+    });
+  }
+
+  @Get('wallet/transfers')
+  async listWalletTransfers(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'RIDER_WALLET_TRANSFERS_FETCHED',
+      message: 'Wallet transfers fetched',
+      requestId: getRequestId(req),
+      data: await this.riderService.listWalletTransfers(user.userId),
+    });
+  }
+
   @Get('trips/history')
   async listTripHistory(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
     return this.apiResponse.success({

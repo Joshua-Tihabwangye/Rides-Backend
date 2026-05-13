@@ -238,4 +238,129 @@ export class SafetyController {
       data: await this.safetyService.deleteEmergencyContact(user.driverId, contactId),
     });
   }
+
+  @Get('trips/:tripId/share-contacts')
+  async listTripShareContacts(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('tripId') tripId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'SHARE_CONTACTS_FETCHED',
+      message: 'Trip share contacts fetched',
+      requestId: getRequestId(req),
+      data: await this.safetyService.listTripShareContacts(user.driverId, tripId),
+    });
+  }
+
+  @Post('trips/:tripId/share-contacts')
+  async addTripShareContact(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('tripId') tripId: string,
+    @Body() body: { name: string; phone: string; relationship?: string },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'SHARE_CONTACT_CREATED',
+      message: 'Trip share contact created',
+      requestId: getRequestId(req),
+      data: await this.safetyService.addTripShareContact(user.driverId, tripId, body),
+    });
+  }
+
+  @Delete('trips/:tripId/share-contacts/:contactId')
+  async deleteTripShareContact(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('tripId') tripId: string,
+    @Param('contactId') contactId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'SHARE_CONTACT_DELETED',
+      message: 'Trip share contact deleted',
+      requestId: getRequestId(req),
+      data: await this.safetyService.deleteTripShareContact(user.driverId, tripId, contactId),
+    });
+  }
+
+  @Post('trips/:tripId/share-link')
+  async createTripShareLink(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('tripId') tripId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'SHARE_LINK_CREATED',
+      message: 'Trip share link created',
+      requestId: getRequestId(req),
+      data: await this.safetyService.createTripShareLink(user.driverId, tripId),
+    });
+  }
+
+  @Get('trips/:tripId/share-status')
+  async getTripShareStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('tripId') tripId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'SHARE_STATUS_FETCHED',
+      message: 'Trip share status fetched',
+      requestId: getRequestId(req),
+      data: await this.safetyService.getTripShareStatus(user.driverId, tripId),
+    });
+  }
+
+  @Get('training/modules')
+  async listTrainingModules(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
+    return this.apiResponse.success({
+      code: 'TRAINING_MODULES_FETCHED',
+      message: 'Training modules fetched',
+      requestId: getRequestId(req),
+      data: await this.safetyService.listTrainingModules(user.driverId),
+    });
+  }
+
+  @Get('training/modules/:moduleId')
+  async getTrainingModule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('moduleId') moduleId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'TRAINING_MODULE_FETCHED',
+      message: 'Training module fetched',
+      requestId: getRequestId(req),
+      data: await this.safetyService.getTrainingModule(user.driverId, moduleId),
+    });
+  }
+
+  @Post('training/modules/:moduleId/attempts')
+  async createTrainingAttempt(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('moduleId') moduleId: string,
+    @Body() body: { answers?: Record<string, unknown> },
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'TRAINING_ATTEMPT_CREATED',
+      message: 'Training attempt created',
+      requestId: getRequestId(req),
+      data: await this.safetyService.createTrainingAttempt(user.driverId, moduleId, body),
+    });
+  }
+
+  @Post('training/modules/:moduleId/complete')
+  async completeTrainingModule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('moduleId') moduleId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'TRAINING_MODULE_COMPLETED',
+      message: 'Training module completed',
+      requestId: getRequestId(req),
+      data: await this.safetyService.completeTrainingModule(user.driverId, moduleId),
+    });
+  }
 }

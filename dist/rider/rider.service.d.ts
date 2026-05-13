@@ -23,6 +23,8 @@ export declare class RiderService {
     private readonly presenceLocationService?;
     private readonly realtimeGateway?;
     private readonly riderRealtimeGateway?;
+    private readonly commuteStore;
+    private readonly paymentIntentStore;
     constructor(riderProfileRepo: Repository<RiderProfile>, tripRepo: Repository<Trip>, jobOfferRepo: Repository<JobOffer>, notificationRepo: Repository<Notification>, userRepo: Repository<User>, walletRepo: Repository<WalletAccount>, earningsLedgerRepo: Repository<EarningsLedger>, riderServiceRequestRepo: Repository<RiderServiceRequest>, presenceLocationService?: PresenceLocationService | undefined, realtimeGateway?: RealtimeGateway | undefined, riderRealtimeGateway?: RiderRealtimeGateway | undefined);
     getProfile(userId: string): Promise<RiderProfile>;
     updateProfile(userId: string, patch: Partial<{
@@ -127,6 +129,85 @@ export declare class RiderService {
         createdAt: number;
         relatedTripId: string | undefined;
     }[]>;
+    listPaymentMethods(userId: string): Promise<{
+        id: string;
+        type: string;
+        label: string;
+        enabled: boolean;
+        isDefault: boolean;
+    }[]>;
+    createPaymentIntent(userId: string, input: {
+        amount: number;
+        currency?: string;
+        serviceType?: string;
+        referenceId?: string;
+        methodId?: string;
+    }): Promise<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        userId: string;
+        amount: number;
+        currency: string;
+        methodId: string;
+        serviceType: string;
+        referenceId: string | undefined;
+        status: string;
+        createdAt: number;
+    }>;
+    verifyPaymentIntent(userId: string, intentId: string, input: {
+        verificationCode?: string;
+    }): Promise<Record<string, unknown>>;
+    listEligiblePromos(userId: string): Promise<{
+        code: string;
+        description: string;
+        discountType: string;
+        discountValue: number;
+    }[]>;
+    applyPromo(userId: string, input: {
+        code: string;
+        orderAmount?: number;
+    }): Promise<{
+        code: string;
+        applied: boolean;
+        discountAmount: number;
+        currency: string;
+        finalAmount: number;
+    }>;
+    listCommutes(userId: string): Promise<Record<string, unknown>[]>;
+    createCommute(userId: string, input: {
+        name?: string;
+        pickupAddress: string;
+        dropoffAddress: string;
+        schedule?: Record<string, unknown>;
+    }): Promise<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        name: string;
+        pickupAddress: string;
+        dropoffAddress: string;
+        schedule: Record<string, unknown>;
+        active: boolean;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+    patchCommute(userId: string, commuteId: string, patch: Record<string, unknown>): Promise<Record<string, unknown>>;
+    deleteCommute(userId: string, commuteId: string): Promise<{
+        deleted: boolean;
+    }>;
+    createWalletTransfer(userId: string, input: {
+        amount: number;
+        destination: string;
+        method?: string;
+        note?: string;
+    }): Promise<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        amount: number;
+        currency: string;
+        destination: string;
+        method: string;
+        note: string | undefined;
+        status: string;
+        createdAt: number;
+    }>;
+    listWalletTransfers(userId: string): Promise<Record<string, unknown>[]>;
     listRentals(userId: string): Promise<{
         id: string;
         riderId: string;

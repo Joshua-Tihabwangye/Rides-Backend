@@ -139,6 +139,54 @@ let AdminOperationsController = class AdminOperationsController {
             data: await this.adminService.getRiderServiceRequest(requestId),
         });
     }
+    async listAgents(req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_AGENTS_FETCHED',
+            message: 'Agents fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.listAgents(),
+        });
+    }
+    async getAgent(agentId, req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_AGENT_FETCHED',
+            message: 'Agent fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.getAgent(agentId),
+        });
+    }
+    async createAgent(user, body, req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_AGENT_CREATED',
+            message: 'Agent created',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.createAgent(user.userId, body, { ipAddress: req.ip, userAgent: req.headers['user-agent'] }),
+        });
+    }
+    async patchAgent(user, agentId, body, req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_AGENT_UPDATED',
+            message: 'Agent updated',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.patchAgent(user.userId, agentId, body, { ipAddress: req.ip, userAgent: req.headers['user-agent'] }),
+        });
+    }
+    async deleteAgent(user, agentId, req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_AGENT_DELETED',
+            message: 'Agent deleted',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.deleteAgent(user.userId, agentId, { ipAddress: req.ip, userAgent: req.headers['user-agent'] }),
+        });
+    }
+    async search(query, req) {
+        return this.apiResponse.success({
+            code: 'ADMIN_SEARCH_RESULTS',
+            message: 'Admin search completed',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.adminService.searchAdmin(query ?? ''),
+        });
+    }
 };
 exports.AdminOperationsController = AdminOperationsController;
 __decorate([
@@ -256,6 +304,57 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], AdminOperationsController.prototype, "getRiderServiceRequest", null);
+__decorate([
+    (0, common_1.Get)('agents'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminOperationsController.prototype, "listAgents", null);
+__decorate([
+    (0, common_1.Get)('agents/:agentId'),
+    __param(0, (0, common_1.Param)('agentId')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AdminOperationsController.prototype, "getAgent", null);
+__decorate([
+    (0, common_1.Post)('agents'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], AdminOperationsController.prototype, "createAgent", null);
+__decorate([
+    (0, common_1.Patch)('agents/:agentId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('agentId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], AdminOperationsController.prototype, "patchAgent", null);
+__decorate([
+    (0, common_1.Delete)('agents/:agentId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('agentId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], AdminOperationsController.prototype, "deleteAgent", null);
+__decorate([
+    (0, common_1.Get)('search'),
+    __param(0, (0, common_1.Query)('query')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AdminOperationsController.prototype, "search", null);
 exports.AdminOperationsController = AdminOperationsController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('admin', 'super_admin'),

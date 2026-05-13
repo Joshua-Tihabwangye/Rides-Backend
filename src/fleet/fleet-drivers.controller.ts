@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiResponseService } from '../common/api/api-response.service';
 import { CurrentUser, type AuthenticatedUser } from '../common/auth/current-user.decorator';
@@ -50,6 +50,34 @@ export class FleetDriversController {
       message: 'Fleet driver updated',
       requestId: getRequestId(req),
       data: await this.fleetService.patchDriver(user.userId, driverId, body),
+    });
+  }
+
+  @Get(':driverId')
+  async getById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('driverId') driverId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'FLEET_DRIVER_FETCHED',
+      message: 'Fleet driver fetched',
+      requestId: getRequestId(req),
+      data: await this.fleetService.getDriverById(user.userId, driverId),
+    });
+  }
+
+  @Delete(':driverId')
+  async deleteById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('driverId') driverId: string,
+    @Req() req: Request,
+  ) {
+    return this.apiResponse.success({
+      code: 'FLEET_DRIVER_DELETED',
+      message: 'Fleet driver deleted',
+      requestId: getRequestId(req),
+      data: await this.fleetService.deleteDriver(user.userId, driverId),
     });
   }
 }

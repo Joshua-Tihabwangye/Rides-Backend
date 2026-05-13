@@ -16,6 +16,7 @@ exports.SafetyService = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
+const crypto_1 = require("crypto");
 const safety_event_entity_1 = require("../entities/safety-event.entity");
 const emergency_contact_entity_1 = require("../entities/emergency-contact.entity");
 const driver_profile_entity_1 = require("../entities/driver-profile.entity");
@@ -24,6 +25,8 @@ let SafetyService = class SafetyService {
         this.safetyEventRepo = safetyEventRepo;
         this.emergencyContactRepo = emergencyContactRepo;
         this.driverProfileRepo = driverProfileRepo;
+        this.shareContactsStore = new Map();
+        this.trainingModuleStore = new Map();
     }
     async requestTemporaryStop(driverId, tripId, note = '') {
         const event = this.safetyEventRepo.create({
@@ -178,6 +181,98 @@ let SafetyService = class SafetyService {
             throw new common_1.NotFoundException('Emergency contact not found');
         }
         return { deleted: true };
+    }
+    async listTripShareContacts(driverId, tripId) {
+        const key = `${driverId}:${tripId}`;
+        return this.shareContactsStore.get(key) ?? [];
+    }
+    async addTripShareContact(driverId, tripId, input) {
+        const key = `${driverId}:${tripId}`;
+        const current = this.shareContactsStore.get(key) ?? [];
+        const created = {
+            id: (0, crypto_1.randomUUID)(),
+            name: input.name,
+            phone: input.phone,
+            relationship: input.relationship,
+            createdAt: Date.now(),
+        };
+        current.unshift(created);
+        this.shareContactsStore.set(key, current.slice(0, 50));
+        return created;
+    }
+    async deleteTripShareContact(driverId, tripId, contactId) {
+        const key = `${driverId}:${tripId}`;
+        const current = this.shareContactsStore.get(key) ?? [];
+        const filtered = current.filter((item) => item.id !== contactId);
+        if (filtered.length === current.length) {
+            throw new common_1.NotFoundException('Share contact not found');
+        }
+        this.shareContactsStore.set(key, filtered);
+        return { deleted: true };
+    }
+    async createTripShareLink(driverId, tripId) {
+        const token = (0, crypto_1.randomUUID)().replace(/-/g, '');
+        return {
+            tripId,
+            shareUrl: `https://evzone.app/follow/${tripId}?token=${token}`,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + 1000 * 60 * 60 * 24,
+            driverId,
+        };
+    }
+    async getTripShareStatus(driverId, tripId) {
+        const contacts = await this.listTripShareContacts(driverId, tripId);
+        return {
+            tripId,
+            contactsCount: contacts.length,
+            sharingEnabled: contacts.length > 0,
+            lastUpdatedAt: Date.now(),
+        };
+    }
+    async listTrainingModules(driverId) {
+        if (!this.trainingModuleStore.has(driverId)) {
+            this.trainingModuleStore.set(driverId, [
+                {
+                    id: 'safety-basics',
+                    title: 'Safety Basics',
+                    description: 'Core trip safety and emergency procedures.',
+                    status: 'published',
+                    progress: 'not_started',
+                },
+                {
+                    id: 'customer-care',
+                    title: 'Customer Care',
+                    description: 'Passenger communication and service quality.',
+                    status: 'published',
+                    progress: 'not_started',
+                },
+            ]);
+        }
+        return this.trainingModuleStore.get(driverId) ?? [];
+    }
+    async getTrainingModule(driverId, moduleId) {
+        const modules = await this.listTrainingModules(driverId);
+        const module = modules.find((item) => item.id === moduleId);
+        if (!module) {
+            throw new common_1.NotFoundException('Training module not found');
+        }
+        return module;
+    }
+    async createTrainingAttempt(driverId, moduleId, input) {
+        const module = await this.getTrainingModule(driverId, moduleId);
+        const score = Number(input.answers ? Object.keys(input.answers).length * 10 : 80);
+        Object.assign(module, { progress: 'attempted', lastAttemptScore: score, lastAttemptAt: Date.now() });
+        return {
+            moduleId,
+            score,
+            passed: score >= 60,
+            attemptedAt: Date.now(),
+        };
+    }
+    async completeTrainingModule(driverId, moduleId) {
+        const module = await this.getTrainingModule(driverId, moduleId);
+        Object.assign(module, { progress: 'completed', completedAt: Date.now() });
+        return module;
     }
 };
 exports.SafetyService = SafetyService;

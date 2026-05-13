@@ -10,4 +10,8 @@ export declare class FleetDriversController {
     list(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-driver.entity").FleetDriver[]>>;
     create(user: AuthenticatedUser, body: CreateFleetDriverDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-driver.entity").FleetDriver>>;
     patch(user: AuthenticatedUser, driverId: string, body: UpdateFleetDriverDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-driver.entity").FleetDriver>>;
+    getById(user: AuthenticatedUser, driverId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-driver.entity").FleetDriver>>;
+    deleteById(user: AuthenticatedUser, driverId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        deleted: boolean;
+    }>>;
 }

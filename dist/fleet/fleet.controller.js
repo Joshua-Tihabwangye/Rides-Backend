@@ -51,6 +51,14 @@ let FleetController = class FleetController {
             data: await this.fleetService.listBranches(user.userId),
         });
     }
+    async getBranchById(user, branchId, req) {
+        return this.apiResponse.success({
+            code: 'FLEET_BRANCH_FETCHED',
+            message: 'Fleet branch fetched',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.fleetService.getBranchById(user.userId, branchId),
+        });
+    }
     async createBranch(user, body, req) {
         return this.apiResponse.success({
             code: 'FLEET_BRANCH_CREATED',
@@ -102,6 +110,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], FleetController.prototype, "listBranches", null);
+__decorate([
+    (0, common_1.Get)('branches/:branchId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('branchId')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], FleetController.prototype, "getBranchById", null);
 __decorate([
     (0, common_1.Post)('branches'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

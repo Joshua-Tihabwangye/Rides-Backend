@@ -31,4 +31,7 @@ export declare class DocumentsController {
     }>>;
     patchDocument(user: AuthenticatedUser, userTypeParam: string, documentId: string, body: PatchDocumentDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/user-document.entity").UserDocument>>;
     resubmit(user: AuthenticatedUser, userTypeParam: string, documentId: string, body: PatchDocumentDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/user-document.entity").UserDocument>>;
+    deleteDocument(user: AuthenticatedUser, userTypeParam: string, documentId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        deleted: boolean;
+    }>>;
 }

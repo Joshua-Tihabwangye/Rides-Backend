@@ -35,6 +35,126 @@ type AuditMeta = {
 
 @Injectable()
 export class AdminService {
+  private readonly agentStore = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      status: 'active' | 'inactive';
+      region?: string;
+      metadata?: Record<string, unknown>;
+      createdAt: number;
+      updatedAt: number;
+    }
+  >();
+
+  private readonly taxConfigStore = new Map<
+    string,
+    {
+      regionId: string;
+      currency: string;
+      vatPercent: number;
+      serviceTaxPercent: number;
+      surchargePercent: number;
+      notes?: string;
+      updatedAt: number;
+    }
+  >([
+    [
+      'UG',
+      {
+        regionId: 'UG',
+        currency: 'UGX',
+        vatPercent: 18,
+        serviceTaxPercent: 0,
+        surchargePercent: 0,
+        updatedAt: Date.now(),
+      },
+    ],
+  ]);
+
+  private readonly invoiceTemplateStore = new Map<
+    string,
+    {
+      id: string;
+      regionId: string;
+      templateName: string;
+      prefix: string;
+      nextNumber: number;
+      footer?: string;
+      updatedAt: number;
+    }
+  >([
+    [
+      'default-ug',
+      {
+        id: 'default-ug',
+        regionId: 'UG',
+        templateName: 'Standard Uganda Invoice',
+        prefix: 'EVZ-UG',
+        nextNumber: 1001,
+        footer: 'Thank you for riding with EVzone.',
+        updatedAt: Date.now(),
+      },
+    ],
+  ]);
+
+  private readonly trainingModuleStore = new Map<
+    string,
+    {
+      id: string;
+      title: string;
+      category: string;
+      status: 'draft' | 'published' | 'archived';
+      version: number;
+      content?: string;
+      updatedAt: number;
+      createdAt: number;
+    }
+  >();
+
+  private readonly policyStore = new Map<
+    string,
+    {
+      id: string;
+      key: string;
+      title: string;
+      scope: 'global' | 'rider' | 'driver' | 'fleet' | 'admin';
+      status: 'draft' | 'active' | 'archived';
+      content: string;
+      version: number;
+      updatedAt: number;
+      createdAt: number;
+    }
+  >();
+
+  private readonly verticalPolicyStore = new Map<
+    string,
+    {
+      verticalId: string;
+      name: string;
+      status: 'active' | 'inactive';
+      rules: Record<string, unknown>;
+      updatedAt: number;
+    }
+  >([
+    [
+      'ride',
+      {
+        verticalId: 'ride',
+        name: 'Ride Hailing',
+        status: 'active',
+        rules: {
+          cancellationWindowMinutes: 5,
+          driverWaitMinutes: 7,
+        },
+        updatedAt: Date.now(),
+      },
+    ],
+  ]);
+
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(DriverProfile) private driverProfileRepo: Repository<DriverProfile>,
@@ -705,6 +825,307 @@ export class AdminService {
       timestamp: Date.now(),
     });
     return created;
+  }
+
+  async listAgents() {
+    return Array.from(this.agentStore.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  async getAgent(agentId: string) {
+    const agent = this.agentStore.get(agentId);
+    if (!agent) {
+      throw new NotFoundException('Agent not found');
+    }
+    return agent;
+  }
+
+  async createAgent(
+    actorId: string,
+    input: { name: string; email: string; role: string; region?: string; status?: 'active' | 'inactive'; metadata?: Record<string, unknown> },
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const now = Date.now();
+    const agent = {
+      id: uuidv4(),
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      status: input.status ?? 'active',
+      region: input.region,
+      metadata: input.metadata,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.agentStore.set(agent.id, agent);
+    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'agent', agent.id, undefined, agent);
+    return agent;
+  }
+
+  async patchAgent(
+    actorId: string,
+    agentId: string,
+    patch: Partial<{ name: string; email: string; role: string; region: string; status: 'active' | 'inactive'; metadata: Record<string, unknown> }>,
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const existing = await this.getAgent(agentId);
+    const before = { ...existing };
+    const updated = {
+      ...existing,
+      ...this.pickDefined(patch, ['name', 'email', 'role', 'region', 'status', 'metadata']),
+      updatedAt: Date.now(),
+    };
+    this.agentStore.set(agentId, updated);
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'agent', agentId, before, updated);
+    return updated;
+  }
+
+  async deleteAgent(actorId: string, agentId: string, meta?: Omit<AuditMeta, 'actorId'>) {
+    const existing = await this.getAgent(agentId);
+    this.agentStore.delete(agentId);
+    await this.recordAudit({ actorId, ...meta }, 'admin.delete', 'agent', agentId, existing, { deleted: true });
+    return { deleted: true };
+  }
+
+  async searchAdmin(query: string) {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return {
+        query,
+        totals: { users: 0, riders: 0, drivers: 0, companies: 0, trips: 0 },
+        results: { users: [], riders: [], drivers: [], companies: [], trips: [] },
+      };
+    }
+
+    const [users, riders, drivers, companies, trips] = await Promise.all([
+      this.userRepo.find(),
+      this.riderProfileRepo.find(),
+      this.driverProfileRepo.find(),
+      this.fleetProfileRepo.find(),
+      this.tripRepo.find(),
+    ]);
+
+    const matches = (value?: string | null) => (value ?? '').toLowerCase().includes(normalized);
+
+    const userResults = users.filter((item) => matches(item.email) || matches(item.phone) || item.roles.some((role) => matches(role)));
+    const riderResults = riders.filter((item) => matches(item.fullName) || matches(item.email) || matches(item.phone) || matches(item.riderId));
+    const driverResults = drivers.filter((item) => matches(item.fullName) || matches(item.email) || matches(item.phone) || matches(item.driverId));
+    const companyResults = companies.filter((item) => matches(item.companyName) || matches(item.contactEmail) || matches(item.fleetId));
+    const tripResults = trips.filter((item) => matches(item.id) || matches(item.riderId) || matches(item.driverId ?? '') || matches(item.status));
+
+    return {
+      query,
+      totals: {
+        users: userResults.length,
+        riders: riderResults.length,
+        drivers: driverResults.length,
+        companies: companyResults.length,
+        trips: tripResults.length,
+      },
+      results: {
+        users: userResults.slice(0, 20),
+        riders: riderResults.slice(0, 20),
+        drivers: driverResults.slice(0, 20),
+        companies: companyResults.slice(0, 20),
+        trips: tripResults.slice(0, 20),
+      },
+    };
+  }
+
+  async getTaxConfig() {
+    return Array.from(this.taxConfigStore.values()).sort((a, b) => a.regionId.localeCompare(b.regionId));
+  }
+
+  async patchTaxConfig(
+    actorId: string,
+    regionId: string,
+    patch: Partial<{ currency: string; vatPercent: number; serviceTaxPercent: number; surchargePercent: number; notes: string }>,
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const existing =
+      this.taxConfigStore.get(regionId) ??
+      ({
+        regionId,
+        currency: 'UGX',
+        vatPercent: 18,
+        serviceTaxPercent: 0,
+        surchargePercent: 0,
+        updatedAt: Date.now(),
+      } as const);
+    const before = this.taxConfigStore.get(regionId);
+    const updated = {
+      ...existing,
+      ...this.pickDefined(patch, ['currency', 'vatPercent', 'serviceTaxPercent', 'surchargePercent', 'notes']),
+      updatedAt: Date.now(),
+    };
+    this.taxConfigStore.set(regionId, updated);
+    await this.recordAudit({ actorId, ...meta }, before ? 'admin.update' : 'admin.create', 'tax_config', regionId, before, updated);
+    return updated;
+  }
+
+  async getInvoiceTemplates() {
+    return Array.from(this.invoiceTemplateStore.values()).sort((a, b) => a.templateName.localeCompare(b.templateName));
+  }
+
+  async patchInvoiceTemplate(
+    actorId: string,
+    templateId: string,
+    patch: Partial<{ regionId: string; templateName: string; prefix: string; nextNumber: number; footer: string }>,
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const existing =
+      this.invoiceTemplateStore.get(templateId) ??
+      ({
+        id: templateId,
+        regionId: 'UG',
+        templateName: 'Standard Invoice',
+        prefix: 'EVZ',
+        nextNumber: 1000,
+        updatedAt: Date.now(),
+      } as const);
+    const before = this.invoiceTemplateStore.get(templateId);
+    const updated = {
+      ...existing,
+      ...this.pickDefined(patch, ['regionId', 'templateName', 'prefix', 'nextNumber', 'footer']),
+      updatedAt: Date.now(),
+    };
+    this.invoiceTemplateStore.set(templateId, updated);
+    await this.recordAudit({ actorId, ...meta }, before ? 'admin.update' : 'admin.create', 'invoice_template', templateId, before, updated);
+    return updated;
+  }
+
+  async listTrainingModules() {
+    return Array.from(this.trainingModuleStore.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  async createTrainingModule(
+    actorId: string,
+    input: { title: string; category: string; status?: 'draft' | 'published' | 'archived'; content?: string },
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const now = Date.now();
+    const module = {
+      id: uuidv4(),
+      title: input.title,
+      category: input.category,
+      status: input.status ?? 'draft',
+      content: input.content,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.trainingModuleStore.set(module.id, module);
+    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'training_module', module.id, undefined, module);
+    return module;
+  }
+
+  async patchTrainingModule(
+    actorId: string,
+    moduleId: string,
+    patch: Partial<{ title: string; category: string; status: 'draft' | 'published' | 'archived'; content: string }>,
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const existing = this.trainingModuleStore.get(moduleId);
+    if (!existing) {
+      throw new NotFoundException('Training module not found');
+    }
+    const before = { ...existing };
+    const updated = {
+      ...existing,
+      ...this.pickDefined(patch, ['title', 'category', 'status', 'content']),
+      version: existing.version + 1,
+      updatedAt: Date.now(),
+    };
+    this.trainingModuleStore.set(moduleId, updated);
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'training_module', moduleId, before, updated);
+    return updated;
+  }
+
+  async deleteTrainingModule(actorId: string, moduleId: string, meta?: Omit<AuditMeta, 'actorId'>) {
+    const existing = this.trainingModuleStore.get(moduleId);
+    if (!existing) {
+      throw new NotFoundException('Training module not found');
+    }
+    this.trainingModuleStore.delete(moduleId);
+    await this.recordAudit({ actorId, ...meta }, 'admin.delete', 'training_module', moduleId, existing, { deleted: true });
+    return { deleted: true };
+  }
+
+  async listPolicies() {
+    return Array.from(this.policyStore.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  async createPolicy(
+    actorId: string,
+    input: { key: string; title: string; scope: 'global' | 'rider' | 'driver' | 'fleet' | 'admin'; status?: 'draft' | 'active' | 'archived'; content: string },
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const now = Date.now();
+    const policy = {
+      id: uuidv4(),
+      key: input.key,
+      title: input.title,
+      scope: input.scope,
+      status: input.status ?? 'draft',
+      content: input.content,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.policyStore.set(policy.id, policy);
+    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'policy', policy.id, undefined, policy);
+    return policy;
+  }
+
+  async patchPolicy(
+    actorId: string,
+    policyId: string,
+    patch: Partial<{ key: string; title: string; scope: 'global' | 'rider' | 'driver' | 'fleet' | 'admin'; status: 'draft' | 'active' | 'archived'; content: string }>,
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const existing = this.policyStore.get(policyId);
+    if (!existing) {
+      throw new NotFoundException('Policy not found');
+    }
+    const before = { ...existing };
+    const updated = {
+      ...existing,
+      ...this.pickDefined(patch, ['key', 'title', 'scope', 'status', 'content']),
+      version: existing.version + 1,
+      updatedAt: Date.now(),
+    };
+    this.policyStore.set(policyId, updated);
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'policy', policyId, before, updated);
+    return updated;
+  }
+
+  async listVerticalPolicies() {
+    return Array.from(this.verticalPolicyStore.values()).sort((a, b) => a.verticalId.localeCompare(b.verticalId));
+  }
+
+  async patchVerticalPolicy(
+    actorId: string,
+    verticalId: string,
+    patch: Partial<{ name: string; status: 'active' | 'inactive'; rules: Record<string, unknown> }>,
+    meta?: Omit<AuditMeta, 'actorId'>,
+  ) {
+    const existing =
+      this.verticalPolicyStore.get(verticalId) ??
+      ({
+        verticalId,
+        name: verticalId.toUpperCase(),
+        status: 'active',
+        rules: {},
+        updatedAt: Date.now(),
+      } as const);
+    const before = this.verticalPolicyStore.get(verticalId);
+    const updated = {
+      ...existing,
+      ...this.pickDefined(patch, ['name', 'status', 'rules']),
+      updatedAt: Date.now(),
+    };
+    this.verticalPolicyStore.set(verticalId, updated);
+    await this.recordAudit({ actorId, ...meta }, before ? 'admin.update' : 'admin.create', 'vertical_policy', verticalId, before, updated);
+    return updated;
   }
 
   async getHealth() {

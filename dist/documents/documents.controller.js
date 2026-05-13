@@ -76,6 +76,16 @@ let DocumentsController = class DocumentsController {
             data: await this.documentsService.resubmitForUser(userType, user.userId, documentId, body),
         });
     }
+    async deleteDocument(user, userTypeParam, documentId, req) {
+        const userType = (0, user_scope_1.normalizeUserTypePath)(userTypeParam);
+        (0, user_scope_1.assertUserScopeAccess)(user.roles, userType);
+        return this.apiResponse.success({
+            code: 'DOCUMENT_DELETED',
+            message: 'Document deleted',
+            requestId: (0, request_id_1.getRequestId)(req),
+            data: await this.documentsService.deleteForUser(userType, user.userId, documentId),
+        });
+    }
 };
 exports.DocumentsController = DocumentsController;
 __decorate([
@@ -128,6 +138,16 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, String, document_dto_1.PatchDocumentDto, Object]),
     __metadata("design:returntype", Promise)
 ], DocumentsController.prototype, "resubmit", null);
+__decorate([
+    (0, common_1.Delete)(':userType/me/documents/:documentId'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('userType')),
+    __param(2, (0, common_1.Param)('documentId')),
+    __param(3, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], DocumentsController.prototype, "deleteDocument", null);
 exports.DocumentsController = DocumentsController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)(),
