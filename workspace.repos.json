@@ -1,0 +1,8 @@
+{
+  "repos": [
+    { "id": "rider", "name": "Rider", "path": "/home/developer/Projects/rider", "type": "rider-app" },
+    { "id": "driver", "name": "Driver-s-app", "path": "/home/developer/Projects/Driver-s-app", "type": "driver-app" },
+    { "id": "fleet", "name": "FleetPartnerAPP", "path": "/home/developer/Projects/FleetPartnerAPP", "type": "fleet-app" },
+    { "id": "admin", "name": "Rides-Admin", "path": "/home/developer/Projects/Rides-Admin", "type": "admin-app" }
+  ]
+}

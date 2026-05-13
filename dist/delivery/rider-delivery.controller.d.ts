@@ -1,0 +1,80 @@
+import type { Request } from 'express';
+import { ApiResponseService } from '../common/api/api-response.service';
+import { type AuthenticatedUser } from '../common/auth/current-user.decorator';
+import { CancelRiderDeliveryDto, CreateDeliveryOrderDto, PatchRiderDeliveryDto } from './dto/delivery.dto';
+import { DeliveryService } from './delivery.service';
+export declare class RiderDeliveryController {
+    private readonly deliveryService;
+    private readonly apiResponse;
+    constructor(deliveryService: DeliveryService, apiResponse: ApiResponseService);
+    listOrders(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        riderId: string;
+        driverId: string;
+        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        pickupAddress: string;
+        dropoffAddress: string;
+        itemDescription: string | undefined;
+        routeId: string;
+        requestedAt: number;
+        updatedAt: number;
+        pickedUpAt: undefined;
+        deliveredAt: number | undefined;
+    }[]>>;
+    getOrder(user: AuthenticatedUser, orderId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        riderId: string;
+        driverId: string;
+        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        pickupAddress: string;
+        dropoffAddress: string;
+        itemDescription: string | undefined;
+        routeId: string;
+        requestedAt: number;
+        updatedAt: number;
+        pickedUpAt: undefined;
+        deliveredAt: number | undefined;
+    }>>;
+    createOrder(user: AuthenticatedUser, body: CreateDeliveryOrderDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        riderId: string;
+        driverId: string;
+        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        pickupAddress: string;
+        dropoffAddress: string;
+        itemDescription: string | undefined;
+        routeId: string;
+        requestedAt: number;
+        updatedAt: number;
+        pickedUpAt: undefined;
+        deliveredAt: number | undefined;
+    }>>;
+    patchOrder(user: AuthenticatedUser, orderId: string, body: PatchRiderDeliveryDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        riderId: string;
+        driverId: string;
+        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        pickupAddress: string;
+        dropoffAddress: string;
+        itemDescription: string | undefined;
+        routeId: string;
+        requestedAt: number;
+        updatedAt: number;
+        pickedUpAt: undefined;
+        deliveredAt: number | undefined;
+    }>>;
+    cancelOrder(user: AuthenticatedUser, orderId: string, body: CancelRiderDeliveryDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        riderId: string;
+        driverId: string;
+        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        pickupAddress: string;
+        dropoffAddress: string;
+        itemDescription: string | undefined;
+        routeId: string;
+        requestedAt: number;
+        updatedAt: number;
+        pickedUpAt: undefined;
+        deliveredAt: number | undefined;
+    }>>;
+}
