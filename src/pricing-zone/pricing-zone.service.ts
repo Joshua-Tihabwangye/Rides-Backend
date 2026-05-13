@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PricingZone } from '../entities/pricing-zone.entity';
-import { Polygon } from 'geojson';
+import type { Polygon } from 'geojson';
 
 @Injectable()
 export class PricingZoneService {

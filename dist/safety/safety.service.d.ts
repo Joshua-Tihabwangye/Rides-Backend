@@ -25,8 +25,8 @@ export declare class SafetyService {
         };
         safetyCheck: {
             status: string;
-            driverAction: "okay" | "sos" | null;
-            passengerAction: "okay" | "sos" | null;
+            driverAction: "sos" | "okay" | null;
+            passengerAction: "sos" | "okay" | null;
         };
         lastEmergencyDispatch: {
             id: string;
@@ -52,8 +52,8 @@ export declare class SafetyService {
         };
         safetyCheck: {
             status: string;
-            driverAction: "okay" | "sos" | null;
-            passengerAction: "okay" | "sos" | null;
+            driverAction: "sos" | "okay" | null;
+            passengerAction: "sos" | "okay" | null;
         };
         lastEmergencyDispatch: {
             id: string;

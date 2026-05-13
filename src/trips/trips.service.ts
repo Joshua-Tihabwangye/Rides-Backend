@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, Optional } from '@n
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import { Trip, TripStatus } from '../entities/trip.entity';
 import { JobOffer } from '../entities/job-offer.entity';
 import { EarningsLedger } from '../entities/earnings-ledger.entity';
@@ -25,6 +26,7 @@ export class TripsService {
     @InjectRepository(EarningsLedger) private earningsLedgerRepo: Repository<EarningsLedger>,
     @InjectRepository(WalletAccount) private walletRepo: Repository<WalletAccount>,
     @Optional() private readonly realtimeGateway?: RealtimeGateway,
+    @Optional() private readonly riderRealtimeGateway?: RiderRealtimeGateway,
   ) {}
 
   async getActive(driverId: string) {
@@ -162,18 +164,21 @@ export class TripsService {
   }
 
   private publishTripEvent(trip: Trip, event: string) {
+    const payload = {
+      tripId: trip.id,
+      driverId: trip.driverId,
+      riderId: trip.riderId,
+      status: trip.status,
+      updatedAt: trip.updatedAt,
+    };
+
     this.realtimeGateway?.publishEvent({
       driverId: trip.driverId,
       tripId: trip.id,
       event,
-      payload: {
-        tripId: trip.id,
-        driverId: trip.driverId,
-        riderId: trip.riderId,
-        status: trip.status,
-        updatedAt: trip.updatedAt,
-      },
+      payload,
     });
+    this.riderRealtimeGateway?.publishToUser(trip.riderId, event, payload);
   }
 
   private async transition(driverId: string, tripId: string, next: TripStatus) {
@@ -220,4 +225,3 @@ export class TripsService {
     return this.tripRepo.save(trip);
   }
 }
-

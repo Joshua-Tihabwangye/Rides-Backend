@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Polygon } from 'geojson';
+import type { Polygon } from 'geojson';
 
 @Entity('pricing_zones')
 export class PricingZone {

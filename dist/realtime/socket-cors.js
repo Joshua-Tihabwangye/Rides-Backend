@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SOCKET_CORS_ORIGINS = void 0;
+exports.SOCKET_EFFECTIVE_CORS_ORIGINS = void 0;
 function parseSocketCorsOrigins(raw) {
     if (!raw?.trim()) {
         return [
@@ -16,5 +16,5 @@ function parseSocketCorsOrigins(raw) {
         .map((origin) => origin.trim())
         .filter(Boolean);
 }
-exports.SOCKET_CORS_ORIGINS = parseSocketCorsOrigins(process.env.SOCKET_CORS_ORIGINS);
+exports.SOCKET_EFFECTIVE_CORS_ORIGINS = parseSocketCorsOrigins(process.env.SOCKET_CORS_ORIGINS || process.env.CORS_ORIGINS);
 //# sourceMappingURL=socket-cors.js.map

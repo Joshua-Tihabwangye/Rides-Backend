@@ -256,6 +256,13 @@ let AdminService = class AdminService {
     async listRoles() {
         return this.roleRepo.find();
     }
+    async getRole(roleId) {
+        const role = await this.roleRepo.findOne({ where: { id: roleId } });
+        if (!role) {
+            throw new common_1.NotFoundException('Role not found');
+        }
+        return role;
+    }
     async createRole(actorId, input, meta) {
         const role = this.roleRepo.create({
             ...input,

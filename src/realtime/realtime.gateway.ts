@@ -10,7 +10,7 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import type { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
-import { SOCKET_CORS_ORIGINS } from './socket-cors';
+import { SOCKET_EFFECTIVE_CORS_ORIGINS } from './socket-cors';
 
 interface DriverSocketData {
   userId: string;
@@ -19,7 +19,7 @@ interface DriverSocketData {
 @Injectable()
 @WebSocketGateway({
   namespace: '/driver',
-  cors: { origin: SOCKET_CORS_ORIGINS },
+  cors: { origin: SOCKET_EFFECTIVE_CORS_ORIGINS },
 })
 export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -36,7 +36,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return;
     }
 
-    const payload = this.authService.verifyAccessToken(token);
+    let payload: { sub: string } | null = null;
+    try {
+      payload = this.authService.verifyAccessToken(token);
+    } catch {
+      client.disconnect(true);
+      return;
+    }
+
     if (!payload) {
       client.disconnect(true);
       return;

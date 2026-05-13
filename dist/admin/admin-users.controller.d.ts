@@ -209,6 +209,7 @@ export declare class AdminUsersController {
     createUser(user: AuthenticatedUser, body: CreateAdminUserDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/user.entity").User>>;
     patchUser(user: AuthenticatedUser, targetUserId: string, body: UpdateAdminUserDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/user.entity").User>>;
     listRoles(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/role.entity").Role[]>>;
+    getRole(roleId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/role.entity").Role>>;
     createRole(user: AuthenticatedUser, body: CreateAdminRoleDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/role.entity").Role>>;
     patchRole(user: AuthenticatedUser, roleId: string, body: UpdateAdminRoleDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/role.entity").Role>>;
 }

@@ -11,7 +11,7 @@ export declare class RiderDeliveryController {
         id: string;
         riderId: string;
         driverId: string;
-        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        status: "pending" | "cancelled" | "accepted" | "picked_up" | "in_transit" | "delivered";
         pickupAddress: string;
         dropoffAddress: string;
         itemDescription: string | undefined;
@@ -25,7 +25,7 @@ export declare class RiderDeliveryController {
         id: string;
         riderId: string;
         driverId: string;
-        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        status: "pending" | "cancelled" | "accepted" | "picked_up" | "in_transit" | "delivered";
         pickupAddress: string;
         dropoffAddress: string;
         itemDescription: string | undefined;
@@ -39,7 +39,7 @@ export declare class RiderDeliveryController {
         id: string;
         riderId: string;
         driverId: string;
-        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        status: "pending" | "cancelled" | "accepted" | "picked_up" | "in_transit" | "delivered";
         pickupAddress: string;
         dropoffAddress: string;
         itemDescription: string | undefined;
@@ -53,7 +53,7 @@ export declare class RiderDeliveryController {
         id: string;
         riderId: string;
         driverId: string;
-        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        status: "pending" | "cancelled" | "accepted" | "picked_up" | "in_transit" | "delivered";
         pickupAddress: string;
         dropoffAddress: string;
         itemDescription: string | undefined;
@@ -67,7 +67,7 @@ export declare class RiderDeliveryController {
         id: string;
         riderId: string;
         driverId: string;
-        status: "cancelled" | "pending" | "accepted" | "picked_up" | "in_transit" | "delivered";
+        status: "pending" | "cancelled" | "accepted" | "picked_up" | "in_transit" | "delivered";
         pickupAddress: string;
         dropoffAddress: string;
         itemDescription: string | undefined;
