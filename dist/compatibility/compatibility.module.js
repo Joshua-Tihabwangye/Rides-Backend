@@ -8,18 +8,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompatibilityContractModule = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
 const compatibility_controller_1 = require("./compatibility.controller");
 const compatibility_service_1 = require("./compatibility.service");
-const feature_flag_entity_1 = require("../entities/feature-flag.entity");
 let CompatibilityContractModule = class CompatibilityContractModule {
 };
 exports.CompatibilityContractModule = CompatibilityContractModule;
 exports.CompatibilityContractModule = CompatibilityContractModule = __decorate([
     (0, common_1.Module)({
-        imports: [
-            typeorm_1.TypeOrmModule.forFeature([feature_flag_entity_1.FeatureFlag]),
-        ],
         controllers: [compatibility_controller_1.CompatibilityContractController],
         providers: [compatibility_service_1.CompatibilityContractService],
         exports: [compatibility_service_1.CompatibilityContractService],

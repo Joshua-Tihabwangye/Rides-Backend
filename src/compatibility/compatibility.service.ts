@@ -1,8 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'crypto';
-import { FeatureFlag } from '../entities/feature-flag.entity';
 import type {
   AppBehaviorContract,
   AppCanonicalContract,
@@ -12,9 +10,7 @@ import type {
 
 @Injectable()
 export class CompatibilityContractService {
-  constructor(
-    @InjectRepository(FeatureFlag) private featureFlagRepo: Repository<FeatureFlag>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly contracts: AppBehaviorContract[] = [
     {
@@ -32,7 +28,6 @@ export class CompatibilityContractService {
          'AuthContext hydrates user+token from localStorage on app mount and clears invalid payloads.',
          'AppDataContext hydrates complex state from evzone_app_data_v1 and continuously persists selected slices.',
          'Delivery WebSocket toggles delivery.websocketConnected and alters delivery tracking badge/labels.',
-         // 'Map services call /api/osm and /api/osrm proxy routes and update route/map rendering state.', // Removed legacy reference
        ],
       mustNotChangeAcceptance: [
         'Sign-in must still produce a storable user object and token pair compatible with existing AuthContext validation.',
@@ -330,13 +325,12 @@ export class CompatibilityContractService {
 
   async getRuntimeFlags(appId: AppId) {
     const flagKey = `${appId}_backend_enabled`;
-    const flags = await this.featureFlagRepo.find({
-      where: [
-        { scope: appId },
-        { scope: 'global' }
-      ]
+    const flags = await this.prisma.featureFlag.findMany({
+      where: {
+        OR: [{ scope: appId }, { scope: 'global' }],
+      },
     });
-    
+
     const backendFlag = flags.find((item) => item.key === flagKey);
 
     return {

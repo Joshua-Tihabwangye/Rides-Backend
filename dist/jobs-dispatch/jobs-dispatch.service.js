@@ -14,14 +14,12 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JobsDispatchService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const job_offer_entity_1 = require("../entities/job-offer.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 const realtime_gateway_1 = require("../realtime/realtime.gateway");
 const trips_service_1 = require("../trips/trips.service");
 let JobsDispatchService = class JobsDispatchService {
-    constructor(jobRepo, tripsService, realtimeGateway) {
-        this.jobRepo = jobRepo;
+    constructor(prisma, tripsService, realtimeGateway) {
+        this.prisma = prisma;
         this.tripsService = tripsService;
         this.realtimeGateway = realtimeGateway;
     }
@@ -31,37 +29,34 @@ let JobsDispatchService = class JobsDispatchService {
             where.status = query.status;
         if (query.type)
             where.type = query.type;
-        return this.jobRepo.find({ where });
+        return this.prisma.jobOffer.findMany({ where });
     }
     async getActive(driverId) {
-        return this.jobRepo.findOne({
+        return this.prisma.jobOffer.findFirst({
             where: {
                 driverId,
-                status: (0, typeorm_2.In)(['accepted', 'in_progress']),
+                status: { in: ['accepted', 'in_progress'] },
             },
         });
     }
     async accept(driverId, jobId) {
-        const job = await this.jobRepo.findOne({ where: { id: jobId, driverId } });
+        const job = await this.prisma.jobOffer.findFirst({ where: { id: jobId, driverId } });
         if (!job) {
             throw new common_1.NotFoundException('Job not found');
         }
         if (!['offered', 'pending'].includes(job.status)) {
             throw new common_1.BadRequestException(`Job cannot be accepted from ${job.status} state`);
         }
-        job.status = 'accepted';
-        job.respondedAt = new Date();
-        await this.jobRepo.save(job);
+        const updatedJob = await this.prisma.jobOffer.update({
+            where: { id: jobId },
+            data: { status: 'accepted', respondedAt: new Date() },
+        });
         const trip = await this.tripsService.startFromJob(driverId, job.id);
         await this.tripsService.markEnRoute(driverId, trip.id);
-        const peerJobs = await this.jobRepo.find({ where: { tripId: job.tripId, status: 'offered' } });
-        for (const peerJob of peerJobs) {
-            if (peerJob.id !== job.id) {
-                peerJob.status = 'cancelled';
-                peerJob.respondedAt = new Date();
-                await this.jobRepo.save(peerJob);
-            }
-        }
+        await this.prisma.jobOffer.updateMany({
+            where: { tripId: job.tripId, status: 'offered', id: { not: job.id } },
+            data: { status: 'cancelled', respondedAt: new Date() },
+        });
         this.realtimeGateway?.publishEvent({
             driverId,
             tripId: trip.id,
@@ -70,26 +65,27 @@ let JobsDispatchService = class JobsDispatchService {
                 jobId: job.id,
                 tripId: trip.id,
                 driverId,
-                status: job.status,
-                respondedAt: job.respondedAt,
+                status: updatedJob.status,
+                respondedAt: updatedJob.respondedAt,
             },
         });
         return {
-            job,
+            job: updatedJob,
             trip,
         };
     }
     async reject(driverId, jobId, reason = '') {
-        const job = await this.jobRepo.findOne({ where: { id: jobId, driverId } });
+        const job = await this.prisma.jobOffer.findFirst({ where: { id: jobId, driverId } });
         if (!job) {
             throw new common_1.NotFoundException('Job not found');
         }
         if (!['offered', 'pending'].includes(job.status)) {
             throw new common_1.BadRequestException(`Job cannot be rejected from ${job.status} state`);
         }
-        job.status = 'rejected';
-        job.respondedAt = new Date();
-        await this.jobRepo.save(job);
+        const updatedJob = await this.prisma.jobOffer.update({
+            where: { id: jobId },
+            data: { status: 'rejected', respondedAt: new Date() },
+        });
         this.realtimeGateway?.publishEvent({
             driverId,
             tripId: job.tripId,
@@ -98,9 +94,9 @@ let JobsDispatchService = class JobsDispatchService {
                 jobId: job.id,
                 tripId: job.tripId,
                 driverId,
-                status: job.status,
+                status: updatedJob.status,
                 reason,
-                respondedAt: job.respondedAt,
+                respondedAt: updatedJob.respondedAt,
             },
         });
         return { jobId, rejected: true, reason };
@@ -109,9 +105,8 @@ let JobsDispatchService = class JobsDispatchService {
 exports.JobsDispatchService = JobsDispatchService;
 exports.JobsDispatchService = JobsDispatchService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(job_offer_entity_1.JobOffer)),
     __param(2, (0, common_1.Optional)()),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         trips_service_1.TripsService,
         realtime_gateway_1.RealtimeGateway])
 ], JobsDispatchService);

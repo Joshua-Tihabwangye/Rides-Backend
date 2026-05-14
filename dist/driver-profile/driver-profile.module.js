@@ -8,17 +8,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DriverProfileModule = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
 const driver_profile_controller_1 = require("./driver-profile.controller");
 const driver_profile_service_1 = require("./driver-profile.service");
-const driver_profile_entity_1 = require("../entities/driver-profile.entity");
-const user_entity_1 = require("../entities/user.entity");
 let DriverProfileModule = class DriverProfileModule {
 };
 exports.DriverProfileModule = DriverProfileModule;
 exports.DriverProfileModule = DriverProfileModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([driver_profile_entity_1.DriverProfile, user_entity_1.User])],
         controllers: [driver_profile_controller_1.DriverProfileController],
         providers: [driver_profile_service_1.DriverProfileService],
         exports: [driver_profile_service_1.DriverProfileService],

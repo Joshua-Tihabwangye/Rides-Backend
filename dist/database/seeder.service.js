@@ -8,19 +8,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 var SeederService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SeederService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const role_entity_1 = require("../entities/role.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 let SeederService = SeederService_1 = class SeederService {
-    constructor(roleRepo) {
-        this.roleRepo = roleRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
         this.logger = new common_1.Logger(SeederService_1.name);
     }
     async onModuleInit() {
@@ -38,9 +33,9 @@ let SeederService = SeederService_1 = class SeederService {
             { name: 'super_admin', description: 'Super administrator', permissions: ['admin.*'] },
         ];
         for (const roleData of defaultRoles) {
-            const exists = await this.roleRepo.findOne({ where: { name: roleData.name } });
+            const exists = await this.prisma.role.findUnique({ where: { name: roleData.name } });
             if (!exists) {
-                await this.roleRepo.save(this.roleRepo.create(roleData));
+                await this.prisma.role.create({ data: roleData });
                 this.logger.log(`Seeded role: ${roleData.name}`);
             }
         }
@@ -49,7 +44,6 @@ let SeederService = SeederService_1 = class SeederService {
 exports.SeederService = SeederService;
 exports.SeederService = SeederService = SeederService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(role_entity_1.Role)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], SeederService);
 //# sourceMappingURL=seeder.service.js.map

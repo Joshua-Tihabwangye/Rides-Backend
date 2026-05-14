@@ -1,5 +1,4 @@
-import { Repository, DataSource } from 'typeorm';
-import { DriverProfile } from '../entities/driver-profile.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { DriverProfileService } from '../driver-profile/driver-profile.service';
 export interface NearbyDriverRecord {
     driverId: string;
@@ -10,10 +9,9 @@ export interface NearbyDriverRecord {
     timestamp?: number;
 }
 export declare class PresenceLocationService {
-    private driverProfileRepo;
+    private readonly prisma;
     private readonly driverProfileService;
-    private readonly dataSource;
-    constructor(driverProfileRepo: Repository<DriverProfile>, driverProfileService: DriverProfileService, dataSource: DataSource);
+    constructor(prisma: PrismaService, driverProfileService: DriverProfileService);
     goOnline(driverId: string): Promise<{
         status: string;
     }>;

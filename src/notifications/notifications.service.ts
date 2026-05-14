@@ -1,37 +1,35 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Notification } from '../entities/notification.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(
-    @InjectRepository(Notification) private notificationRepo: Repository<Notification>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(userType: string, userId: string) {
-    return this.notificationRepo.find({
+    return this.prisma.notification.findMany({
       where: { userType, userId },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async markRead(userType: string, userId: string, notificationId: string) {
-    const notification = await this.notificationRepo.findOne({
+    const notification = await this.prisma.notification.findFirst({
       where: { id: notificationId, userType, userId },
     });
     if (!notification) {
       throw new NotFoundException('Notification not found');
     }
-    notification.read = true;
-    return this.notificationRepo.save(notification);
+    return this.prisma.notification.update({
+      where: { id: notificationId },
+      data: { read: true, isRead: true },
+    });
   }
 
   async markAllRead(userType: string, userId: string) {
-    const result = await this.notificationRepo.update(
-      { userType, userId, read: false },
-      { read: true },
-    );
-    return { updated: result.affected ?? 0 };
+    const result = await this.prisma.notification.updateMany({
+      where: { userType, userId, read: false },
+      data: { read: true, isRead: true },
+    });
+    return { updated: result.count };
   }
 }

@@ -111,14 +111,14 @@ export class FleetVehiclesController {
   ) {
     const fleetId = user.fleetId ?? user.userId;
     const vehicle = await this.vehiclesService.findFleetVehicleById(fleetId, vehicleId);
-    const documents = vehicle.documents || {};
+    const documents = (vehicle.documents as any) || {};
     documents[body.documentType] = {
       fileUrl: body.fileUrl,
       expiryDate: body.expiryDate || null,
       status: 'under_review',
       updatedAt: Date.now(),
     };
-    await this.vehiclesService.updateFleet(fleetId, vehicleId, { documents } as any);
+    await this.vehiclesService.updateFleet(fleetId, vehicleId, { documents: documents as any });
     return this.apiResponse.success({
       code: 'FLEET_VEHICLE_DOCUMENT_CREATED',
       message: 'Fleet vehicle document created',

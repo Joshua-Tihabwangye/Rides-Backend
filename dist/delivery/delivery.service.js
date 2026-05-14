@@ -14,22 +14,14 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DeliveryService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
+const prisma_service_1 = require("../prisma/prisma.service");
 const presence_location_service_1 = require("../presence-location/presence-location.service");
 const realtime_gateway_1 = require("../realtime/realtime.gateway");
 const scoped_realtime_gateway_1 = require("../realtime/scoped-realtime.gateway");
-const delivery_order_entity_1 = require("../entities/delivery-order.entity");
-const delivery_route_entity_1 = require("../entities/delivery-route.entity");
-const notification_entity_1 = require("../entities/notification.entity");
-const driver_profile_entity_1 = require("../entities/driver-profile.entity");
 const uuid_1 = require("uuid");
 let DeliveryService = class DeliveryService {
-    constructor(orderRepo, routeRepo, notificationRepo, driverProfileRepo, presenceLocationService, realtimeGateway, riderRealtimeGateway) {
-        this.orderRepo = orderRepo;
-        this.routeRepo = routeRepo;
-        this.notificationRepo = notificationRepo;
-        this.driverProfileRepo = driverProfileRepo;
+    constructor(prisma, presenceLocationService, realtimeGateway, riderRealtimeGateway) {
+        this.prisma = prisma;
         this.presenceLocationService = presenceLocationService;
         this.realtimeGateway = realtimeGateway;
         this.riderRealtimeGateway = riderRealtimeGateway;
@@ -38,36 +30,40 @@ let DeliveryService = class DeliveryService {
         const assignedDriverId = await this.resolveDriverId(input);
         const routeId = (0, uuid_1.v4)();
         const orderId = (0, uuid_1.v4)();
-        const order = this.orderRepo.create({
-            id: orderId,
-            riderId,
-            driverId: assignedDriverId,
-            status: 'requested',
-            routeId,
-            pickup: input.pickupAddress,
-            dropoff: input.dropoffAddress,
-            qrCode: `QR-${orderId.slice(0, 8).toUpperCase()}`,
+        const order = await this.prisma.deliveryOrder.create({
+            data: {
+                id: orderId,
+                riderId,
+                driverId: assignedDriverId,
+                status: 'requested',
+                routeId,
+                pickup: input.pickupAddress,
+                dropoff: input.dropoffAddress,
+                qrCode: `QR-${orderId.slice(0, 8).toUpperCase()}`,
+            },
         });
-        const route = this.routeRepo.create({
-            id: routeId,
-            driverId: assignedDriverId,
-            orderId,
-            status: 'pending',
-            stops: [
-                { id: (0, uuid_1.v4)(), routeId, status: 'pending', address: input.pickupAddress },
-                { id: (0, uuid_1.v4)(), routeId, status: 'pending', address: input.dropoffAddress },
-            ],
+        await this.prisma.deliveryRoute.create({
+            data: {
+                id: routeId,
+                driverId: assignedDriverId,
+                orderId,
+                status: 'pending',
+                stops: [
+                    { id: (0, uuid_1.v4)(), routeId, status: 'pending', address: input.pickupAddress },
+                    { id: (0, uuid_1.v4)(), routeId, status: 'pending', address: input.dropoffAddress },
+                ],
+            },
         });
-        await this.orderRepo.save(order);
-        await this.routeRepo.save(route);
-        const notification = this.notificationRepo.create({
-            userId: assignedDriverId,
-            userType: 'driver',
-            title: 'New delivery order',
-            body: `${input.pickupAddress || 'Pickup'} to ${input.dropoffAddress || 'Dropoff'}`,
-            isRead: false,
+        await this.prisma.notification.create({
+            data: {
+                userId: assignedDriverId,
+                userType: 'driver',
+                title: 'New delivery order',
+                body: `${input.pickupAddress || 'Pickup'} to ${input.dropoffAddress || 'Dropoff'}`,
+                isRead: false,
+                read: false,
+            },
         });
-        await this.notificationRepo.save(notification);
         this.realtimeGateway?.publishEvent({
             driverId: assignedDriverId,
             routeId,
@@ -84,58 +80,64 @@ let DeliveryService = class DeliveryService {
         return this.toRiderDeliveryResponse(order);
     }
     async listRiderOrders(riderId) {
-        const orders = await this.orderRepo.find({
+        const orders = await this.prisma.deliveryOrder.findMany({
             where: { riderId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
         return orders.map((order) => this.toRiderDeliveryResponse(order));
     }
     async getRiderOrder(riderId, orderId) {
-        const order = await this.orderRepo.findOne({ where: { id: orderId, riderId } });
+        const order = await this.prisma.deliveryOrder.findFirst({ where: { id: orderId, riderId } });
         if (!order) {
             throw new common_1.NotFoundException('Delivery order not found');
         }
         return this.toRiderDeliveryResponse(order);
     }
     async patchRiderOrder(riderId, orderId, patch) {
-        const order = await this.orderRepo.findOne({ where: { id: orderId, riderId } });
+        const order = await this.prisma.deliveryOrder.findFirst({ where: { id: orderId, riderId } });
         if (!order) {
             throw new common_1.NotFoundException('Delivery order not found');
         }
         if (patch.status) {
-            order.status = patch.status;
             await this.syncRouteStatus(order.routeId, patch.status);
             this.publishRiderDeliveryPatch(riderId, order.id, patch.status, 'Delivery updated');
         }
-        await this.orderRepo.save(order);
-        return this.toRiderDeliveryResponse(order);
+        const updated = await this.prisma.deliveryOrder.update({
+            where: { id: orderId },
+            data: { status: patch.status },
+        });
+        return this.toRiderDeliveryResponse(updated);
     }
     async cancelRiderOrder(riderId, orderId, reason) {
-        const order = await this.orderRepo.findOne({ where: { id: orderId, riderId } });
+        const order = await this.prisma.deliveryOrder.findFirst({ where: { id: orderId, riderId } });
         if (!order) {
             throw new common_1.NotFoundException('Delivery order not found');
         }
-        order.status = 'cancelled';
-        await this.orderRepo.save(order);
+        const updated = await this.prisma.deliveryOrder.update({
+            where: { id: orderId },
+            data: { status: 'cancelled' },
+        });
         await this.syncRouteStatus(order.routeId, 'cancelled');
         this.publishRiderDeliveryPatch(riderId, order.id, 'cancelled', reason || 'Delivery cancelled');
-        return this.toRiderDeliveryResponse(order);
+        return this.toRiderDeliveryResponse(updated);
     }
     async listOrders(driverId) {
-        return this.orderRepo.find({ where: { driverId } });
+        return this.prisma.deliveryOrder.findMany({ where: { driverId } });
     }
     async acceptOrder(driverId, orderId) {
-        const order = await this.orderRepo.findOne({ where: { id: orderId, driverId } });
+        const order = await this.prisma.deliveryOrder.findFirst({ where: { id: orderId, driverId } });
         if (!order) {
             throw new common_1.NotFoundException('Delivery order not found');
         }
-        order.status = 'accepted';
-        const saved = await this.orderRepo.save(order);
-        this.publishRiderDeliveryPatch(saved.riderId, saved.id, 'accepted', 'Driver accepted delivery');
-        return saved;
+        const updated = await this.prisma.deliveryOrder.update({
+            where: { id: orderId },
+            data: { status: 'accepted' },
+        });
+        this.publishRiderDeliveryPatch(updated.riderId, updated.id, 'accepted', 'Driver accepted delivery');
+        return updated;
     }
     async getRoute(driverId, routeId) {
-        const route = await this.routeRepo.findOne({ where: { id: routeId, driverId } });
+        const route = await this.prisma.deliveryRoute.findFirst({ where: { id: routeId, driverId } });
         if (!route) {
             throw new common_1.NotFoundException('Delivery route not found');
         }
@@ -143,10 +145,12 @@ let DeliveryService = class DeliveryService {
     }
     async pickupConfirm(driverId, routeId) {
         const route = await this.getRoute(driverId, routeId);
-        route.status = 'pickup_confirmed';
-        await this.routeRepo.save(route);
+        await this.prisma.deliveryRoute.update({
+            where: { id: routeId },
+            data: { status: 'pickup_confirmed' },
+        });
         await this.updateOrderFromRoute(routeId, 'picked_up');
-        return route;
+        return { ...route, status: 'pickup_confirmed' };
     }
     async qrVerify(driverId, routeId, qrValue) {
         if (!qrValue.trim()) {
@@ -156,50 +160,63 @@ let DeliveryService = class DeliveryService {
         if (route.status !== 'pickup_confirmed') {
             throw new common_1.BadRequestException('Route must be pickup_confirmed before QR verification');
         }
-        route.status = 'qr_verified';
-        return this.routeRepo.save(route);
+        return this.prisma.deliveryRoute.update({
+            where: { id: routeId },
+            data: { status: 'qr_verified' },
+        });
     }
     async startRoute(driverId, routeId) {
         const route = await this.getRoute(driverId, routeId);
         if (!['pickup_confirmed', 'qr_verified'].includes(route.status)) {
             throw new common_1.BadRequestException('Route is not ready to start');
         }
-        route.status = 'in_progress';
-        await this.routeRepo.save(route);
+        await this.prisma.deliveryRoute.update({
+            where: { id: routeId },
+            data: { status: 'in_progress' },
+        });
         await this.updateOrderFromRoute(routeId, 'in_transit');
-        return route;
+        return { ...route, status: 'in_progress' };
     }
     async completeStop(driverId, routeId, stopId) {
         const route = await this.getRoute(driverId, routeId);
-        const stop = route.stops.find((item) => item.id === stopId);
+        const stops = route.stops || [];
+        const stop = stops.find((item) => item.id === stopId);
         if (!stop) {
             throw new common_1.NotFoundException('Delivery stop not found');
         }
         stop.status = 'completed';
-        await this.routeRepo.save(route);
+        await this.prisma.deliveryRoute.update({
+            where: { id: routeId },
+            data: { stops: stops },
+        });
         return {
             routeId,
             stop,
-            remainingStops: route.stops.filter((item) => item.status !== 'completed').length,
+            remainingStops: stops.filter((item) => item.status !== 'completed').length,
         };
     }
     async dropoffComplete(driverId, routeId) {
         const route = await this.getRoute(driverId, routeId);
-        const incomplete = route.stops.filter((item) => item.status !== 'completed');
+        const stops = route.stops || [];
+        const incomplete = stops.filter((item) => item.status !== 'completed');
         if (incomplete.length > 0) {
             throw new common_1.BadRequestException('All stops must be completed before dropoff confirmation');
         }
-        route.status = 'completed';
-        await this.routeRepo.save(route);
+        await this.prisma.deliveryRoute.update({
+            where: { id: routeId },
+            data: { status: 'completed' },
+        });
         await this.updateOrderFromRoute(routeId, 'delivered');
-        return route;
+        return { ...route, status: 'completed' };
     }
     async updateOrderFromRoute(routeId, status) {
-        const order = await this.orderRepo.findOne({ where: { routeId } });
+        const order = await this.prisma.deliveryOrder.findFirst({ where: { routeId } });
         if (order) {
-            order.status = status;
-            const saved = await this.orderRepo.save(order);
-            this.publishRiderDeliveryPatch(saved.riderId, saved.id, this.toRealtimeStatus(saved.status), 'Delivery status updated');
+            const updated = await this.prisma.deliveryOrder.update({
+                where: { id: order.id },
+                data: { status: status },
+            });
+            this.publishRiderDeliveryPatch(updated.riderId, updated.id, this.toRealtimeStatus(updated.status), 'Delivery status updated');
         }
     }
     async resolveDriverId(input) {
@@ -209,7 +226,7 @@ let DeliveryService = class DeliveryService {
                 return nearbyDrivers[0].driverId;
             }
         }
-        const firstDriver = await this.driverProfileRepo.findOne({ where: {} });
+        const firstDriver = await this.prisma.driverProfile.findFirst();
         if (!firstDriver) {
             throw new common_1.NotFoundException('No driver available for delivery assignment');
         }
@@ -218,25 +235,29 @@ let DeliveryService = class DeliveryService {
     async syncRouteStatus(routeId, orderStatus) {
         if (!routeId)
             return;
-        const route = await this.routeRepo.findOne({ where: { id: routeId } });
+        const route = await this.prisma.deliveryRoute.findUnique({ where: { id: routeId } });
         if (!route)
             return;
+        let routeStatus = route.status;
         if (orderStatus === 'cancelled') {
-            route.status = 'cancelled';
+            routeStatus = 'cancelled';
         }
         else if (orderStatus === 'delivered') {
-            route.status = 'completed';
+            routeStatus = 'completed';
         }
         else if (orderStatus === 'in_transit' || orderStatus === 'out_for_delivery') {
-            route.status = 'in_progress';
+            routeStatus = 'in_progress';
         }
         else if (orderStatus === 'picked_up') {
-            route.status = 'pickup_confirmed';
+            routeStatus = 'pickup_confirmed';
         }
         else if (orderStatus === 'accepted') {
-            route.status = 'pending';
+            routeStatus = 'pending';
         }
-        await this.routeRepo.save(route);
+        await this.prisma.deliveryRoute.update({
+            where: { id: routeId },
+            data: { status: routeStatus },
+        });
     }
     toRiderDeliveryResponse(order) {
         return {
@@ -311,17 +332,10 @@ let DeliveryService = class DeliveryService {
 exports.DeliveryService = DeliveryService;
 exports.DeliveryService = DeliveryService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(delivery_order_entity_1.DeliveryOrder)),
-    __param(1, (0, typeorm_1.InjectRepository)(delivery_route_entity_1.DeliveryRoute)),
-    __param(2, (0, typeorm_1.InjectRepository)(notification_entity_1.Notification)),
-    __param(3, (0, typeorm_1.InjectRepository)(driver_profile_entity_1.DriverProfile)),
-    __param(4, (0, common_1.Optional)()),
-    __param(5, (0, common_1.Optional)()),
-    __param(6, (0, common_1.Optional)()),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
+    __param(1, (0, common_1.Optional)()),
+    __param(2, (0, common_1.Optional)()),
+    __param(3, (0, common_1.Optional)()),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         presence_location_service_1.PresenceLocationService,
         realtime_gateway_1.RealtimeGateway,
         scoped_realtime_gateway_1.RiderRealtimeGateway])

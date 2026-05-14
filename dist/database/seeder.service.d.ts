@@ -1,10 +1,9 @@
 import { OnModuleInit } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { Role } from '../entities/role.entity';
+import { PrismaService } from '../prisma/prisma.service';
 export declare class SeederService implements OnModuleInit {
-    private roleRepo;
+    private readonly prisma;
     private readonly logger;
-    constructor(roleRepo: Repository<Role>);
+    constructor(prisma: PrismaService);
     onModuleInit(): Promise<void>;
     private seedRoles;
 }

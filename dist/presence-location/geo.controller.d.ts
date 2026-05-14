@@ -9,5 +9,5 @@ export declare class GeoController {
     private readonly apiResponse;
     constructor(presenceLocationService: PresenceLocationService, pricingZoneService: PricingZoneService, apiResponse: ApiResponseService);
     nearbyDrivers(query: NearbyDriversQueryDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("./presence-location.service").NearbyDriverRecord[]>>;
-    getPricingZone(lat: number, lng: number, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/pricing-zone.entity").PricingZone | null>>;
+    getPricingZone(lat: number, lng: number, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<any>>;
 }

@@ -13,9 +13,37 @@ export declare class EarningsCashoutController {
         currency: string;
         count: number;
     }>>;
-    getEvents(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/earnings-ledger.entity").EarningsLedger[]>>;
-    getWalletEventsCompat(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/earnings-ledger.entity").EarningsLedger[]>>;
-    getWallet(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/wallet-account.entity").WalletAccount | {
+    getEvents(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.EarningsType;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        tripId: string | null;
+        deliveryOrderId: string | null;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+    }[]>>;
+    getWalletEventsCompat(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.EarningsType;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        tripId: string | null;
+        deliveryOrderId: string | null;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+    }[]>>;
+    getWallet(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        driverId: string | null;
+        updatedAt: Date;
+        userId: string;
+        currency: string;
+        balance: import("@prisma/client-runtime-utils").Decimal;
+        settings: import("@prisma/client/runtime/client").JsonValue;
+    } | {
         driverId: string;
         currency: string;
         balance: number;
@@ -25,8 +53,48 @@ export declare class EarningsCashoutController {
         label: string;
         minAmount: number;
     }[]>;
-    postCashoutRequest(user: AuthenticatedUser, body: CashoutRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/cashout-request.entity").CashoutRequest>>;
-    postWalletCashoutCompat(user: AuthenticatedUser, body: CashoutRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/cashout-request.entity").CashoutRequest>>;
-    listCashoutRequests(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/cashout-request.entity").CashoutRequest[]>>;
-    listWalletCashoutsCompat(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/cashout-request.entity").CashoutRequest[]>>;
+    postCashoutRequest(user: AuthenticatedUser, body: CashoutRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.CashoutStatus;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        method: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
+    postWalletCashoutCompat(user: AuthenticatedUser, body: CashoutRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.CashoutStatus;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        method: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
+    listCashoutRequests(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.CashoutStatus;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        method: import("@prisma/client/runtime/client").JsonValue;
+    }[]>>;
+    listWalletCashoutsCompat(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.CashoutStatus;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        method: import("@prisma/client/runtime/client").JsonValue;
+    }[]>>;
 }

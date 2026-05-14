@@ -8,15 +8,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocumentsService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const user_document_entity_1 = require("../entities/user-document.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 const REQUIRED_DOCUMENT_TYPES = {
     driver: [
         'national_id_or_passport',
@@ -31,36 +26,40 @@ const REQUIRED_DOCUMENT_TYPES = {
     admin: ['staff_id'],
 };
 let DocumentsService = class DocumentsService {
-    constructor(documentRepo) {
-        this.documentRepo = documentRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
     }
     async upsertForUser(userType, userId, input) {
         this.ensureFutureDate(input.expiryDate);
-        let doc = await this.documentRepo.findOne({
+        const existing = await this.prisma.userDocument.findFirst({
             where: { userType, userId, documentType: input.documentType },
         });
-        if (doc) {
-            doc.fileUrl = input.fileUrl;
-            doc.expiryDate = input.expiryDate;
-            doc.status = 'under_review';
-            doc.rejectionReason = null;
+        if (existing) {
+            return this.prisma.userDocument.update({
+                where: { id: existing.id },
+                data: {
+                    fileUrl: input.fileUrl,
+                    expiryDate: input.expiryDate,
+                    status: 'under_review',
+                    rejectionReason: null,
+                },
+            });
         }
-        else {
-            doc = this.documentRepo.create({
+        return this.prisma.userDocument.create({
+            data: {
                 userType,
                 userId,
                 documentType: input.documentType,
                 fileUrl: input.fileUrl,
                 expiryDate: input.expiryDate,
                 status: 'under_review',
-            });
-        }
-        return this.documentRepo.save(doc);
+            },
+        });
     }
     async listForUser(userType, userId) {
-        return this.documentRepo.find({
+        return this.prisma.userDocument.findMany({
             where: { userType, userId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
     }
     async getDocumentsStatusForUser(userType, userId) {
@@ -68,23 +67,24 @@ let DocumentsService = class DocumentsService {
         return this.buildStatusPayload(userType, docs);
     }
     async patchForUser(userType, userId, documentId, patch) {
-        const doc = await this.documentRepo.findOne({
+        const doc = await this.prisma.userDocument.findFirst({
             where: { id: documentId, userId, userType },
         });
         if (!doc) {
             throw new common_1.NotFoundException('Document not found');
         }
+        const data = {};
         if (patch.expiryDate) {
             this.ensureFutureDate(patch.expiryDate);
-            doc.expiryDate = patch.expiryDate;
+            data.expiryDate = patch.expiryDate;
         }
         if (patch.fileUrl)
-            doc.fileUrl = patch.fileUrl;
+            data.fileUrl = patch.fileUrl;
         if (patch.status)
-            doc.status = patch.status;
+            data.status = patch.status;
         if (patch.rejectionReason !== undefined)
-            doc.rejectionReason = patch.rejectionReason;
-        return this.documentRepo.save(doc);
+            data.rejectionReason = patch.rejectionReason;
+        return this.prisma.userDocument.update({ where: { id: documentId }, data });
     }
     async resubmitForUser(userType, userId, documentId, input) {
         return this.patchForUser(userType, userId, documentId, {
@@ -94,13 +94,13 @@ let DocumentsService = class DocumentsService {
         });
     }
     async deleteForUser(userType, userId, documentId) {
-        const doc = await this.documentRepo.findOne({
+        const doc = await this.prisma.userDocument.findFirst({
             where: { id: documentId, userId, userType },
         });
         if (!doc) {
             throw new common_1.NotFoundException('Document not found');
         }
-        await this.documentRepo.remove(doc);
+        await this.prisma.userDocument.delete({ where: { id: documentId } });
         return { deleted: true };
     }
     buildStatusPayload(userType, docs) {
@@ -172,7 +172,6 @@ let DocumentsService = class DocumentsService {
 exports.DocumentsService = DocumentsService;
 exports.DocumentsService = DocumentsService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_document_entity_1.UserDocument)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], DocumentsService);
 //# sourceMappingURL=documents.service.js.map

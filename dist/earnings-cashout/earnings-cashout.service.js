@@ -8,29 +8,20 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EarningsCashoutService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const earnings_ledger_entity_1 = require("../entities/earnings-ledger.entity");
-const wallet_account_entity_1 = require("../entities/wallet-account.entity");
-const cashout_request_entity_1 = require("../entities/cashout-request.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 let EarningsCashoutService = class EarningsCashoutService {
-    constructor(earningsRepo, walletRepo, cashoutRepo) {
-        this.earningsRepo = earningsRepo;
-        this.walletRepo = walletRepo;
-        this.cashoutRepo = cashoutRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
     }
     async getSummary(driverId, period = 'week') {
         const threshold = this.periodThresholdDate(period);
-        const events = await this.earningsRepo.find({
+        const events = await this.prisma.earningsLedger.findMany({
             where: {
                 driverId,
-                createdAt: (0, typeorm_2.MoreThanOrEqual)(threshold),
+                createdAt: { gte: threshold },
             },
         });
         const total = events.reduce((sum, event) => sum + Number(event.amount), 0);
@@ -42,13 +33,13 @@ let EarningsCashoutService = class EarningsCashoutService {
         };
     }
     async getEvents(driverId) {
-        return this.earningsRepo.find({
+        return this.prisma.earningsLedger.findMany({
             where: { driverId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
     }
     async getWallet(driverId) {
-        const wallet = await this.walletRepo.findOne({ where: { driverId } });
+        const wallet = await this.prisma.walletAccount.findFirst({ where: { driverId } });
         if (!wallet) {
             return {
                 driverId,
@@ -65,28 +56,31 @@ let EarningsCashoutService = class EarningsCashoutService {
         ];
     }
     async createCashoutRequest(driverId, input) {
-        const wallet = await this.walletRepo.findOne({ where: { driverId } });
+        const wallet = await this.prisma.walletAccount.findFirst({ where: { driverId } });
         if (!wallet) {
             throw new common_1.BadRequestException('Wallet not found');
         }
         if (input.amount > Number(wallet.balance)) {
             throw new common_1.BadRequestException('Insufficient wallet balance');
         }
-        wallet.balance = Number(wallet.balance) - input.amount;
-        await this.walletRepo.save(wallet);
-        const request = this.cashoutRepo.create({
-            driverId,
-            method: { id: input.methodId },
-            amount: input.amount,
-            status: 'pending',
+        await this.prisma.walletAccount.update({
+            where: { id: wallet.id },
+            data: { balance: Number(wallet.balance) - input.amount },
         });
-        await this.cashoutRepo.save(request);
-        return request;
+        return this.prisma.cashoutRequest.create({
+            data: {
+                driverId,
+                userId: wallet.userId,
+                method: { id: input.methodId },
+                amount: input.amount,
+                status: 'pending',
+            },
+        });
     }
     async listCashoutRequests(driverId) {
-        return this.cashoutRepo.find({
+        return this.prisma.cashoutRequest.findMany({
             where: { driverId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
     }
     periodThresholdDate(period) {
@@ -107,11 +101,6 @@ let EarningsCashoutService = class EarningsCashoutService {
 exports.EarningsCashoutService = EarningsCashoutService;
 exports.EarningsCashoutService = EarningsCashoutService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(earnings_ledger_entity_1.EarningsLedger)),
-    __param(1, (0, typeorm_1.InjectRepository)(wallet_account_entity_1.WalletAccount)),
-    __param(2, (0, typeorm_1.InjectRepository)(cashout_request_entity_1.CashoutRequest)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], EarningsCashoutService);
 //# sourceMappingURL=earnings-cashout.service.js.map

@@ -1,16 +1,11 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Role } from '../entities/role.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
   private readonly logger = new Logger(SeederService.name);
 
-  constructor(
-    @InjectRepository(Role)
-    private roleRepo: Repository<Role>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
     await this.seedRoles();
@@ -29,9 +24,9 @@ export class SeederService implements OnModuleInit {
     ];
 
     for (const roleData of defaultRoles) {
-      const exists = await this.roleRepo.findOne({ where: { name: roleData.name } });
+      const exists = await this.prisma.role.findUnique({ where: { name: roleData.name } });
       if (!exists) {
-        await this.roleRepo.save(this.roleRepo.create(roleData));
+        await this.prisma.role.create({ data: roleData });
         this.logger.log(`Seeded role: ${roleData.name}`);
       }
     }

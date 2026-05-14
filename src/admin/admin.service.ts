@@ -1,33 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, MoreThanOrEqual } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { DriverProfile } from '../entities/driver-profile.entity';
-import { RiderProfile } from '../entities/rider-profile.entity';
-import { AdminProfile } from '../entities/admin-profile.entity';
-import { Role } from '../entities/role.entity';
-import { FleetPartnerProfile } from '../entities/fleet-partner-profile.entity';
-import { FleetBranch } from '../entities/fleet-branch.entity';
-import { Approval } from '../entities/approval.entity';
-import { Trip } from '../entities/trip.entity';
-import { FleetDispatch } from '../entities/fleet-dispatch.entity';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { FleetPayout } from '../entities/fleet-payout.entity';
-import { WalletAccount } from '../entities/wallet-account.entity';
-import { SafetyEvent } from '../entities/safety-event.entity';
-import { RiskCase } from '../entities/risk-case.entity';
-import { PricingConfig } from '../entities/pricing-config.entity';
-import { Promo } from '../entities/promo.entity';
-import { ServiceConfig } from '../entities/service-config.entity';
-import { AuditLog } from '../entities/audit-log.entity';
-import { FeatureFlag } from '../entities/feature-flag.entity';
-import { PricingZone } from '../entities/pricing-zone.entity';
-import { RiderServiceRequest } from '../entities/rider-service-request.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { AdminRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import { v4 as uuidv4 } from 'uuid';
-import type { Polygon } from 'geojson';
 
-type AuditMeta = {
+export type AuditMeta = {
   actorId: string;
   ipAddress?: string;
   userAgent?: string | string[];
@@ -156,33 +132,12 @@ export class AdminService {
   ]);
 
   constructor(
-    @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(DriverProfile) private driverProfileRepo: Repository<DriverProfile>,
-    @InjectRepository(RiderProfile) private riderProfileRepo: Repository<RiderProfile>,
-    @InjectRepository(AdminProfile) private adminProfileRepo: Repository<AdminProfile>,
-    @InjectRepository(Role) private roleRepo: Repository<Role>,
-    @InjectRepository(FleetPartnerProfile) private fleetProfileRepo: Repository<FleetPartnerProfile>,
-    @InjectRepository(FleetBranch) private fleetBranchRepo: Repository<FleetBranch>,
-    @InjectRepository(Approval) private approvalRepo: Repository<Approval>,
-    @InjectRepository(Trip) private tripRepo: Repository<Trip>,
-    @InjectRepository(FleetDispatch) private fleetDispatchRepo: Repository<FleetDispatch>,
-    @InjectRepository(EarningsLedger) private earningsLedgerRepo: Repository<EarningsLedger>,
-    @InjectRepository(FleetPayout) private fleetPayoutRepo: Repository<FleetPayout>,
-    @InjectRepository(WalletAccount) private walletRepo: Repository<WalletAccount>,
-    @InjectRepository(SafetyEvent) private safetyRepo: Repository<SafetyEvent>,
-    @InjectRepository(RiskCase) private riskRepo: Repository<RiskCase>,
-    @InjectRepository(PricingConfig) private pricingRepo: Repository<PricingConfig>,
-    @InjectRepository(Promo) private promoRepo: Repository<Promo>,
-    @InjectRepository(ServiceConfig) private serviceConfigRepo: Repository<ServiceConfig>,
-    @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
-    @InjectRepository(FeatureFlag) private flagRepo: Repository<FeatureFlag>,
-    @InjectRepository(PricingZone) private pricingZoneRepo: Repository<PricingZone>,
-    @InjectRepository(RiderServiceRequest) private riderServiceRequestRepo: Repository<RiderServiceRequest>,
+    private readonly prisma: PrismaService,
     private readonly adminRealtimeGateway: AdminRealtimeGateway,
   ) {}
 
   async getProfile(userId: string) {
-    const profile = await this.adminProfileRepo.findOne({ where: { userId } });
+    const profile = await this.prisma.adminProfile.findFirst({ where: { userId } });
     if (!profile) {
       throw new NotFoundException('Admin profile not found');
     }
@@ -194,34 +149,32 @@ export class AdminService {
     patch: Partial<{ firstName: string; lastName: string; department: string; permissions: string[] }>,
   ) {
     const profile = await this.getProfile(userId);
-    Object.assign(profile, patch);
-    return this.adminProfileRepo.save(profile);
+    return this.prisma.adminProfile.update({ where: { id: profile.id }, data: patch });
   }
 
   async listRiders() {
-    const riders = await this.riderProfileRepo.find();
-    const riderIds = riders.map(r => r.userId);
-    const users = await this.userRepo.find({ where: { id: In(riderIds) } });
-    const userMap = new Map(users.map(u => [u.id, u]));
+    const riders = await this.prisma.riderProfile.findMany();
+    const riderIds = riders.map((r) => r.userId);
+    const users = await this.prisma.user.findMany({ where: { id: { in: riderIds } } });
+    const userMap = new Map(users.map((u) => [u.id, u]));
 
-    return riders.map(profile => {
+    return riders.map((profile) => {
       const user = userMap.get(profile.userId);
       return {
         ...profile,
         userId: user?.id,
         status: user?.status ?? 'active',
-        roles: user?.roles ?? ['rider']
+        roles: user?.roles ?? ['rider'],
       };
     });
   }
 
   async getRider(riderId: string) {
-    // riderId is the User.id (userId)
-    const profile = await this.riderProfileRepo.findOne({ where: { userId: riderId } });
+    const profile = await this.prisma.riderProfile.findFirst({ where: { userId: riderId } });
     if (!profile) {
       throw new NotFoundException('Rider not found');
     }
-    const user = await this.userRepo.findOne({ where: { id: riderId } });
+    const user = await this.prisma.user.findFirst({ where: { id: riderId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -229,7 +182,7 @@ export class AdminService {
       ...profile,
       userId: user.id,
       status: user.status ?? 'active',
-      roles: user.roles ?? ['rider']
+      roles: user.roles ?? ['rider'],
     };
   }
 
@@ -239,28 +192,30 @@ export class AdminService {
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
     const userId = uuidv4();
-    const user = this.userRepo.create({
-      id: userId,
-      email: input.email,
-      password: 'password123',
-      phone: input.phone,
-      roles: ['rider'],
-      status: 'active',
+    await this.prisma.user.create({
+      data: {
+        id: userId,
+        email: input.email,
+        password: 'password123',
+        phone: input.phone,
+        roles: ['rider'],
+        status: 'active',
+      },
     });
-    await this.userRepo.save(user);
 
-    const profile = this.riderProfileRepo.create({
-      userId,
-      fullName: input.fullName ?? input.email.split('@')[0],
-      email: input.email,
-      phone: input.phone ?? '',
-      city: input.city ?? 'Kampala',
-      country: input.country ?? 'Uganda',
+    const profile = await this.prisma.riderProfile.create({
+      data: {
+        userId,
+        fullName: input.fullName ?? input.email.split('@')[0],
+        email: input.email,
+        phone: input.phone ?? '',
+        city: input.city ?? 'Kampala',
+        country: input.country ?? 'Uganda',
+      },
     });
-    await this.riderProfileRepo.save(profile);
 
-    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'rider', userId, undefined, profile);
-    return { ...profile, userId, roles: user.roles, status: user.status };
+    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'rider', userId, undefined, profile!);
+    return { ...profile, userId, roles: ['rider'], status: 'active' };
   }
 
   async patchRider(
@@ -269,32 +224,39 @@ export class AdminService {
     patch: Partial<{ fullName: string; email: string; phone: string; city: string; country: string; status: string }>,
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const profile = await this.riderProfileRepo.findOne({ where: { userId } });
+    const profile = await this.prisma.riderProfile.findFirst({ where: { userId } });
     if (!profile) {
       throw new NotFoundException('Rider not found');
     }
     const before = { ...profile };
-    Object.assign(profile, this.pickDefined(patch, ['fullName', 'email', 'phone', 'city', 'country']));
-    await this.riderProfileRepo.save(profile);
+    await this.prisma.riderProfile.update({
+      where: { id: profile.id },
+      data: this.pickDefined(patch, ['fullName', 'email', 'phone', 'city', 'country']) as any,
+    });
 
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
     if (user) {
-      user.email = patch.email ?? user.email;
-      user.phone = patch.phone ?? user.phone;
-      user.status = (patch.status as any) ?? user.status;
-      await this.userRepo.save(user);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: patch.email ?? user.email,
+          phone: patch.phone ?? user.phone,
+          status: (patch.status as any) ?? user.status,
+        },
+      });
     }
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'rider', userId, before, profile);
-    return { ...profile, userId: user?.id, roles: user?.roles ?? ['rider'], status: user?.status ?? 'active' };
+    const updatedProfile = await this.prisma.riderProfile.findFirst({ where: { userId } });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'rider', userId, before, updatedProfile!);
+    return { ...updatedProfile!, userId: user?.id, roles: user?.roles ?? ['rider'], status: user?.status ?? 'active' };
   }
 
   async listDrivers() {
-    const drivers = await this.driverProfileRepo.find();
-    const userIds = drivers.map(d => d.userId);
-    const users = await this.userRepo.find({ where: { id: In(userIds) } });
-    const userMap = new Map(users.map(u => [u.id, u]));
+    const drivers = await this.prisma.driverProfile.findMany();
+    const userIds = drivers.map((d) => d.userId);
+    const users = await this.prisma.user.findMany({ where: { id: { in: userIds } } });
+    const userMap = new Map(users.map((u) => [u.id, u]));
 
-    return drivers.map(profile => {
+    return drivers.map((profile) => {
       const user = userMap.get(profile.userId);
       return {
         ...profile,
@@ -306,12 +268,11 @@ export class AdminService {
   }
 
   async getDriver(driverId: string) {
-    // driverId is the User.id (userId)
-    const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
     if (!profile) {
       throw new NotFoundException('Driver not found');
     }
-    const user = await this.userRepo.findOne({ where: { id: driverId } });
+    const user = await this.prisma.user.findFirst({ where: { id: driverId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -329,28 +290,30 @@ export class AdminService {
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
     const userId = uuidv4();
-    const user = this.userRepo.create({
-      id: userId,
-      email: input.email,
-      password: 'password123',
-      phone: input.phone,
-      roles: ['driver'],
-      status: 'active',
+    await this.prisma.user.create({
+      data: {
+        id: userId,
+        email: input.email,
+        password: 'password123',
+        phone: input.phone,
+        roles: ['driver'],
+        status: 'active',
+      },
     });
-    await this.userRepo.save(user);
 
-    const profile = this.driverProfileRepo.create({
-      userId,
-      firstName: input.fullName?.split(' ')[0] ?? input.email.split('@')[0],
-      lastName: input.fullName?.split(' ').slice(1).join(' ') ?? '',
-      city: input.city ?? 'Kampala',
-      country: input.country ?? 'Uganda',
-      status: 'offline',
+    const profile = await this.prisma.driverProfile.create({
+      data: {
+        userId,
+        firstName: input.fullName?.split(' ')[0] ?? input.email.split('@')[0],
+        lastName: input.fullName?.split(' ').slice(1).join(' ') ?? '',
+        city: input.city ?? 'Kampala',
+        country: input.country ?? 'Uganda',
+        status: 'offline',
+      },
     });
-    await this.driverProfileRepo.save(profile);
 
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'driver', userId, undefined, profile);
-    return { ...profile, userId, roles: user.roles, status: user.status };
+    return { ...profile, userId, roles: ['driver'], status: 'active' };
   }
 
   async patchDriver(
@@ -359,66 +322,81 @@ export class AdminService {
     patch: Partial<{ fullName: string; email: string; phone: string; city: string; country: string; status: string }>,
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const profile = await this.driverProfileRepo.findOne({ where: { userId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId } });
     if (!profile) {
       throw new NotFoundException('Driver not found');
     }
     const before = { ...profile };
-    // Map fullName to firstName/lastName if needed, or just skip if the entity uses firstName/lastName
-    Object.assign(profile, this.pickDefined(patch, ['city', 'country', 'status']));
-    await this.driverProfileRepo.save(profile);
+    await this.prisma.driverProfile.update({
+      where: { id: profile.id },
+      data: this.pickDefined(patch, ['city', 'country', 'status']) as any,
+    });
 
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
     if (user) {
-      user.email = patch.email ?? user.email;
-      user.phone = patch.phone ?? user.phone;
-      user.status = (patch.status as any) ?? user.status;
-      await this.userRepo.save(user);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: patch.email ?? user.email,
+          phone: patch.phone ?? user.phone,
+          status: (patch.status as any) ?? user.status,
+        },
+      });
     }
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'driver', userId, before, profile);
-    return { ...profile, userId: user?.id, roles: user?.roles ?? ['driver'], status: user?.status ?? 'active' };
+    const updatedProfile = await this.prisma.driverProfile.findFirst({ where: { userId } });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'driver', userId, before, updatedProfile!);
+    return { ...updatedProfile!, userId: user?.id, roles: user?.roles ?? ['driver'], status: user?.status ?? 'active' };
   }
 
   async listUsers() {
-    const users = await this.userRepo.find();
-    return users.map(user => ({
+    const users = await this.prisma.user.findMany();
+    return users.map((user) => ({
       ...user,
-      profileType: user.roles.includes('rider') ? 'rider' : user.roles.includes('driver') ? 'driver' : user.roles.some(r => r.startsWith('fleet')) ? 'fleet' : 'user'
+      profileType: user.roles.includes('rider')
+        ? 'rider'
+        : user.roles.includes('driver')
+          ? 'driver'
+          : user.roles.some((r) => r.startsWith('fleet'))
+            ? 'fleet'
+            : 'user',
     }));
   }
 
   async createUser(actorId: string, input: { email: string; phone?: string; roles: string[] }, meta?: Omit<AuditMeta, 'actorId'>) {
-    const user = this.userRepo.create({
-      id: uuidv4(),
-      email: input.email,
-      password: 'password123',
-      phone: input.phone,
-      roles: input.roles,
-      status: 'active',
+    const user = await this.prisma.user.create({
+      data: {
+        id: uuidv4(),
+        email: input.email,
+        password: 'password123',
+        phone: input.phone,
+        roles: input.roles,
+        status: 'active',
+      },
     });
-    await this.userRepo.save(user);
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'user', user.id, undefined, user);
     return user;
   }
 
   async patchUser(actorId: string, userId: string, patch: Partial<{ email: string; phone: string; roles: string[]; status: string }>, meta?: Omit<AuditMeta, 'actorId'>) {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
     const before = { ...user };
-    Object.assign(user, this.pickDefined(patch, ['email', 'phone', 'roles', 'status']));
-    await this.userRepo.save(user);
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'user', userId, before, user);
-    return user;
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: this.pickDefined(patch, ['email', 'phone', 'roles', 'status']) as any,
+    });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'user', userId, before, updated);
+    return updated;
   }
 
   async listRoles() {
-    return this.roleRepo.find();
+    return this.prisma.role.findMany();
   }
 
   async getRole(roleId: string) {
-    const role = await this.roleRepo.findOne({ where: { id: roleId } });
+    const role = await this.prisma.role.findFirst({ where: { id: roleId } });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
@@ -426,34 +404,31 @@ export class AdminService {
   }
 
   async createRole(actorId: string, input: { name: string; description?: string; permissions: string[] }, meta?: Omit<AuditMeta, 'actorId'>) {
-    const role = this.roleRepo.create({
-      ...input,
-    });
-    await this.roleRepo.save(role);
+    const role = await this.prisma.role.create({ data: input });
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'role', role.id, undefined, role);
     return role;
   }
 
   async patchRole(actorId: string, roleId: string, patch: Partial<{ description?: string; permissions: string[] }>, meta?: Omit<AuditMeta, 'actorId'>) {
-    const role = await this.roleRepo.findOne({ where: { id: roleId } });
+    const role = await this.prisma.role.findFirst({ where: { id: roleId } });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
     const before = { ...role };
-    Object.assign(role, this.pickDefined(patch, ['description', 'permissions']));
-    await this.roleRepo.save(role);
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'role', roleId, before, role);
-    return role;
+    const updated = await this.prisma.role.update({
+      where: { id: roleId },
+      data: this.pickDefined(patch, ['description', 'permissions']),
+    });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'role', roleId, before, updated);
+    return updated;
   }
 
   async listCompanies() {
-    const companies = await this.fleetProfileRepo.find();
-    // In a real app we'd join branches, but let's keep it simple
-    return companies;
+    return this.prisma.fleetPartnerProfile.findMany();
   }
 
   async getCompany(companyId: string) {
-    const company = await this.fleetProfileRepo.findOne({ where: { fleetId: companyId } });
+    const company = await this.prisma.fleetPartnerProfile.findFirst({ where: { fleetId: companyId } });
     if (!company) {
       throw new NotFoundException('Company not found');
     }
@@ -466,35 +441,38 @@ export class AdminService {
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
     const fleetId = uuidv4();
-    const company = this.fleetProfileRepo.create({
-      fleetId,
-      companyName: input.companyName,
-      contactEmail: input.contactEmail,
-      contactPhone: input.contactPhone,
-      registrationNumber: input.registrationNumber,
-      taxId: input.taxId,
-      status: 'pending',
+    const company = await this.prisma.fleetPartnerProfile.create({
+      data: {
+        fleetId,
+        companyName: input.companyName,
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone,
+        registrationNumber: input.registrationNumber,
+        taxId: input.taxId,
+        status: 'pending' as any,
+      } as any,
     });
-    await this.fleetProfileRepo.save(company);
 
-    const user = this.userRepo.create({
-      id: fleetId,
-      email: input.contactEmail,
-      password: 'password123',
-      phone: input.contactPhone,
-      roles: ['fleet_owner'],
-      status: 'active',
-      fleetId,
+    await this.prisma.user.create({
+      data: {
+        id: fleetId,
+        email: input.contactEmail,
+        password: 'password123',
+        phone: input.contactPhone,
+        roles: ['fleet_owner'],
+        status: 'active',
+        fleetId,
+      },
     });
-    await this.userRepo.save(user);
 
-    const approval = this.approvalRepo.create({
-      entityType: 'company',
-      entityId: fleetId,
-      status: 'pending',
-      requestedBy: fleetId,
+    const approval = await this.prisma.approval.create({
+      data: {
+        entityType: 'company',
+        entityId: fleetId,
+        status: 'pending',
+        requestedBy: fleetId,
+      },
     });
-    await this.approvalRepo.save(approval);
 
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'company', fleetId, undefined, company);
     return { ...company, approvalId: approval.id };
@@ -506,30 +484,36 @@ export class AdminService {
     patch: Partial<{ companyName: string; contactEmail: string; contactPhone: string; registrationNumber?: string; taxId?: string; status: string }>,
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const company = await this.fleetProfileRepo.findOne({ where: { fleetId: companyId } });
+    const company = await this.prisma.fleetPartnerProfile.findFirst({ where: { fleetId: companyId } });
     if (!company) {
       throw new NotFoundException('Company not found');
     }
     const before = { ...company };
-    Object.assign(company, this.pickDefined(patch, ['companyName', 'contactEmail', 'contactPhone', 'registrationNumber', 'taxId', 'status']));
-    await this.fleetProfileRepo.save(company);
+    const updated = await this.prisma.fleetPartnerProfile.update({
+      where: { id: company.id },
+      data: this.pickDefined(patch, ['companyName', 'contactEmail', 'contactPhone', 'registrationNumber', 'taxId', 'status']) as any,
+    });
 
-    const user = await this.userRepo.findOne({ where: { fleetId: companyId } });
+    const user = await this.prisma.user.findFirst({ where: { fleetId: companyId } });
     if (user) {
-      user.email = patch.contactEmail ?? user.email;
-      user.phone = patch.contactPhone ?? user.phone;
-      await this.userRepo.save(user);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          email: patch.contactEmail ?? user.email,
+          phone: patch.contactPhone ?? user.phone,
+        },
+      });
     }
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'company', companyId, before, company);
-    return company;
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'company', companyId, before, updated);
+    return updated;
   }
 
   async listApprovals() {
-    return this.approvalRepo.find({ order: { createdAt: 'DESC' } });
+    return this.prisma.approval.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   async getApproval(approvalId: string) {
-    const approval = await this.approvalRepo.findOne({ where: { id: approvalId } });
+    const approval = await this.prisma.approval.findFirst({ where: { id: approvalId } });
     if (!approval) {
       throw new NotFoundException('Approval not found');
     }
@@ -542,52 +526,63 @@ export class AdminService {
     input: { decision: 'approved' | 'rejected'; notes?: string },
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const approval = await this.approvalRepo.findOne({ where: { id: approvalId } });
+    const approval = await this.prisma.approval.findFirst({ where: { id: approvalId } });
     if (!approval) {
       throw new NotFoundException('Approval not found');
     }
     const before = { ...approval };
-    approval.status = input.decision;
-    approval.notes = input.notes ?? approval.notes;
-    approval.reviewedBy = actorId;
-    approval.reviewedAt = Date.now();
-    await this.approvalRepo.save(approval);
+    const updated = await this.prisma.approval.update({
+      where: { id: approvalId },
+      data: {
+        status: input.decision,
+        notes: input.notes ?? approval.notes,
+        reviewedBy: actorId,
+        reviewedAt: Date.now(),
+      },
+    });
 
     if (approval.entityType === 'company') {
-      const company = await this.fleetProfileRepo.findOne({ where: { fleetId: approval.entityId } });
+      const company = await this.prisma.fleetPartnerProfile.findFirst({ where: { fleetId: approval.entityId } });
       if (company) {
-        company.status = input.decision === 'approved' ? 'approved' : 'suspended';
-        await this.fleetProfileRepo.save(company);
+        await this.prisma.fleetPartnerProfile.update({
+          where: { id: company.id },
+          data: { status: input.decision === 'approved' ? 'approved' : 'suspended' },
+        });
       }
     }
 
-    await this.recordAudit({ actorId, ...meta }, 'admin.review', 'approval', approvalId, before, approval);
+    await this.recordAudit({ actorId, ...meta }, 'admin.review', 'approval', approvalId, before, updated);
     this.adminRealtimeGateway.publishToAll('approval.reviewed', {
-      approvalId: approval.id,
-      status: approval.status,
+      approvalId: updated.id,
+      status: updated.status,
       reviewedBy: actorId,
-      reviewedAt: approval.reviewedAt,
+      reviewedAt: updated.reviewedAt,
     });
-    return approval;
+    return updated;
   }
 
   async getOperationsAnalytics(period: 'day' | 'week' | 'month' | 'quarter' | 'year' = 'week') {
     const threshold = this.periodThresholdDate(period);
-    
+
     const [tripsCount, completedTripsCount, activeTripsCount] = await Promise.all([
-      this.tripRepo.count({ where: { createdAt: MoreThanOrEqual(threshold) } }),
-      this.tripRepo.count({ where: { createdAt: MoreThanOrEqual(threshold), status: 'completed' } }),
-      this.tripRepo.count({ where: { createdAt: MoreThanOrEqual(threshold), status: In(['driver_assigned', 'driver_arriving', 'arrived', 'in_progress']) } }),
+      this.prisma.trip.count({ where: { createdAt: { gte: threshold } } }),
+      this.prisma.trip.count({ where: { createdAt: { gte: threshold }, status: 'completed' } }),
+      this.prisma.trip.count({
+        where: {
+          createdAt: { gte: threshold },
+          status: { in: ['driver_assigned', 'driver_arriving', 'arrived', 'in_progress'] },
+        },
+      }),
     ]);
 
     const [dispatchesCount, pendingDispatchesCount] = await Promise.all([
-      this.fleetDispatchRepo.count({ where: { createdAt: MoreThanOrEqual(threshold) } }),
-      this.fleetDispatchRepo.count({ where: { createdAt: MoreThanOrEqual(threshold), status: 'pending' } }),
+      this.prisma.fleetDispatch.count({ where: { createdAt: { gte: threshold } } }),
+      this.prisma.fleetDispatch.count({ where: { createdAt: { gte: threshold }, status: 'pending' } }),
     ]);
 
     const [totalDrivers, onlineDrivers] = await Promise.all([
-      this.driverProfileRepo.count(),
-      this.driverProfileRepo.count({ where: { status: 'online' } }),
+      this.prisma.driverProfile.count(),
+      this.prisma.driverProfile.count({ where: { status: 'online' } }),
     ]);
 
     return {
@@ -610,10 +605,10 @@ export class AdminService {
 
   async getFinanceAnalytics(period: 'day' | 'week' | 'month' | 'quarter' | 'year' = 'month') {
     const threshold = this.periodThresholdDate(period);
-    
-    const earnings = await this.earningsLedgerRepo.find({ where: { createdAt: MoreThanOrEqual(threshold) } });
-    const payouts = await this.fleetPayoutRepo.find({ where: { createdAt: MoreThanOrEqual(threshold) } });
-    const wallets = await this.walletRepo.find();
+
+    const earnings = await this.prisma.earningsLedger.findMany({ where: { createdAt: { gte: threshold } } });
+    const payouts = await this.prisma.fleetPayout.findMany({ where: { createdAt: { gte: threshold } } });
+    const wallets = await this.prisma.walletAccount.findMany();
 
     return {
       period,
@@ -626,11 +621,11 @@ export class AdminService {
   }
 
   async listSafetyIncidents() {
-    return this.safetyRepo.find({ order: { createdAt: 'DESC' } });
+    return this.prisma.safetyEvent.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   async listRiskCases() {
-    return this.riskRepo.find({ order: { createdAt: 'DESC' } });
+    return this.prisma.riskCase.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   async listRiderServiceRequests(
@@ -645,9 +640,9 @@ export class AdminService {
     if (query.status) where.status = query.status;
     if (query.riderId) where.riderId = query.riderId;
 
-    const records = await this.riderServiceRequestRepo.find({
+    const records = await this.prisma.riderServiceRequest.findMany({
       where,
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
 
     return records.map((record) => ({
@@ -663,7 +658,7 @@ export class AdminService {
   }
 
   async getRiderServiceRequest(requestId: string) {
-    const record = await this.riderServiceRequestRepo.findOne({ where: { id: requestId } });
+    const record = await this.prisma.riderServiceRequest.findFirst({ where: { id: requestId } });
     if (!record) {
       throw new NotFoundException('Rider service request not found');
     }
@@ -680,7 +675,7 @@ export class AdminService {
   }
 
   async getRiskCase(riskCaseId: string) {
-    const riskCase = await this.riskRepo.findOne({ where: { id: riskCaseId } });
+    const riskCase = await this.prisma.riskCase.findFirst({ where: { id: riskCaseId } });
     if (!riskCase) {
       throw new NotFoundException('Risk case not found');
     }
@@ -688,11 +683,11 @@ export class AdminService {
   }
 
   async listPricing() {
-    return this.pricingRepo.find();
+    return this.prisma.pricingConfig.findMany();
   }
 
   async getPricing(pricingId: string) {
-    const pricing = await this.pricingRepo.findOne({ where: { id: pricingId } });
+    const pricing = await this.prisma.pricingConfig.findFirst({ where: { id: pricingId } });
     if (!pricing) {
       throw new NotFoundException('Pricing config not found');
     }
@@ -700,30 +695,31 @@ export class AdminService {
   }
 
   async createPricing(actorId: string, input: { name: string; service: string; pricingRules: Record<string, unknown> }, meta?: Omit<AuditMeta, 'actorId'>) {
-    const pricing = this.pricingRepo.create({ ...input, status: 'active' });
-    await this.pricingRepo.save(pricing);
+    const pricing = await this.prisma.pricingConfig.create({ data: { ...input, status: 'active', pricingRules: input.pricingRules as any } as any });
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'pricing', pricing.id, undefined, pricing);
     return pricing;
   }
 
   async patchPricing(actorId: string, pricingId: string, patch: Partial<{ name: string; service: string; status: string; pricingRules: Record<string, unknown> }>, meta?: Omit<AuditMeta, 'actorId'>) {
-    const pricing = await this.pricingRepo.findOne({ where: { id: pricingId } });
+    const pricing = await this.prisma.pricingConfig.findFirst({ where: { id: pricingId } });
     if (!pricing) {
       throw new NotFoundException('Pricing config not found');
     }
     const before = { ...pricing };
-    Object.assign(pricing, this.pickDefined(patch, ['name', 'service', 'status', 'pricingRules']));
-    await this.pricingRepo.save(pricing);
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'pricing', pricingId, before, pricing);
-    return pricing;
+    const updated = await this.prisma.pricingConfig.update({
+      where: { id: pricingId },
+      data: this.pickDefined(patch, ['name', 'service', 'status', 'pricingRules']) as any,
+    });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'pricing', pricingId, before, updated);
+    return updated;
   }
 
   async listPromos() {
-    return this.promoRepo.find();
+    return this.prisma.promo.findMany();
   }
 
   async getPromo(promoId: string) {
-    const promo = await this.promoRepo.findOne({ where: { id: promoId } });
+    const promo = await this.prisma.promo.findFirst({ where: { id: promoId } });
     if (!promo) {
       throw new NotFoundException('Promo not found');
     }
@@ -731,30 +727,31 @@ export class AdminService {
   }
 
   async createPromo(actorId: string, input: { code: string; description: string; discountType: string; discountValue: number }, meta?: Omit<AuditMeta, 'actorId'>) {
-    const promo = this.promoRepo.create({ ...input, status: 'draft' });
-    await this.promoRepo.save(promo);
+    const promo = await this.prisma.promo.create({ data: { ...input, status: 'draft' as any, discountType: input.discountType as any } as any });
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'promo', promo.id, undefined, promo);
     return promo;
   }
 
   async patchPromo(actorId: string, promoId: string, patch: Partial<{ description: string; discountType: string; discountValue: number; status: string }>, meta?: Omit<AuditMeta, 'actorId'>) {
-    const promo = await this.promoRepo.findOne({ where: { id: promoId } });
+    const promo = await this.prisma.promo.findFirst({ where: { id: promoId } });
     if (!promo) {
       throw new NotFoundException('Promo not found');
     }
     const before = { ...promo };
-    Object.assign(promo, this.pickDefined(patch, ['description', 'discountType', 'discountValue', 'status']));
-    await this.promoRepo.save(promo);
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'promo', promoId, before, promo);
-    return promo;
+    const updated = await this.prisma.promo.update({
+      where: { id: promoId },
+      data: this.pickDefined(patch, ['description', 'discountType', 'discountValue', 'status']) as any,
+    });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'promo', promoId, before, updated);
+    return updated;
   }
 
   async listServices() {
-    return this.serviceConfigRepo.find();
+    return this.prisma.serviceConfig.findMany();
   }
 
   async getService(serviceId: string) {
-    const service = await this.serviceConfigRepo.findOne({ where: { id: serviceId } });
+    const service = await this.prisma.serviceConfig.findFirst({ where: { id: serviceId } });
     if (!service) {
       throw new NotFoundException('Service config not found');
     }
@@ -762,30 +759,31 @@ export class AdminService {
   }
 
   async createServiceConfig(actorId: string, input: { key: string; name: string; enabled?: boolean; configuration: Record<string, unknown> }, meta?: Omit<AuditMeta, 'actorId'>) {
-    const serviceConfig = this.serviceConfigRepo.create({ ...input });
-    await this.serviceConfigRepo.save(serviceConfig);
+    const serviceConfig = await this.prisma.serviceConfig.create({ data: { ...input, configuration: input.configuration as any } as any });
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'service_config', serviceConfig.id, undefined, serviceConfig);
     return serviceConfig;
   }
 
   async patchServiceConfig(actorId: string, serviceId: string, patch: Partial<{ name: string; enabled: boolean; configuration: Record<string, unknown> }>, meta?: Omit<AuditMeta, 'actorId'>) {
-    const serviceConfig = await this.serviceConfigRepo.findOne({ where: { id: serviceId } });
+    const serviceConfig = await this.prisma.serviceConfig.findFirst({ where: { id: serviceId } });
     if (!serviceConfig) {
       throw new NotFoundException('Service config not found');
     }
     const before = { ...serviceConfig };
-    Object.assign(serviceConfig, this.pickDefined(patch, ['name', 'enabled', 'configuration']));
-    await this.serviceConfigRepo.save(serviceConfig);
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'service_config', serviceId, before, serviceConfig);
-    return serviceConfig;
+    const updated = await this.prisma.serviceConfig.update({
+      where: { id: serviceId },
+      data: this.pickDefined(patch, ['name', 'enabled', 'configuration']) as any,
+    });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'service_config', serviceId, before, updated);
+    return updated;
   }
 
   async getAuditLog() {
-    return this.auditRepo.find({ order: { createdAt: 'DESC' } });
+    return this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
   async getFlags() {
-    return this.flagRepo.find();
+    return this.prisma.featureFlag.findMany();
   }
 
   async patchFeatureFlag(
@@ -794,29 +792,32 @@ export class AdminService {
     patch: Partial<{ enabled: boolean; description: string }>,
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const existing = await this.flagRepo.findOne({ where: { key: flagKey } });
+    const existing = await this.prisma.featureFlag.findFirst({ where: { key: flagKey } });
     if (existing) {
       const before = { ...existing };
-      Object.assign(existing, this.pickDefined(patch, ['enabled', 'description']));
-      await this.flagRepo.save(existing);
-      await this.recordAudit({ actorId, ...meta }, 'admin.update', 'feature_flag', existing.id, before, existing);
+      const updated = await this.prisma.featureFlag.update({
+        where: { id: existing.id },
+        data: this.pickDefined(patch, ['enabled', 'description']),
+      });
+      await this.recordAudit({ actorId, ...meta }, 'admin.update', 'feature_flag', existing.id, before, updated);
       this.adminRealtimeGateway.publishToAll('flag.changed', {
-        flagKey: existing.key,
-        enabled: existing.enabled,
-        scope: existing.scope,
+        flagKey: updated.key,
+        enabled: updated.enabled,
+        scope: updated.scope,
         timestamp: Date.now(),
       });
-      return existing;
+      return updated;
     }
 
     const scope = this.inferFeatureFlagScope(flagKey);
-    const created = this.flagRepo.create({
-      key: flagKey,
-      enabled: patch.enabled ?? false,
-      scope,
-      description: patch.description,
+    const created = await this.prisma.featureFlag.create({
+      data: {
+        key: flagKey,
+        enabled: patch.enabled ?? false,
+        scope,
+        description: patch.description,
+      },
     });
-    await this.flagRepo.save(created);
     await this.recordAudit({ actorId, ...meta }, 'admin.create', 'feature_flag', created.id, undefined, created);
     this.adminRealtimeGateway.publishToAll('flag.created', {
       flagKey: created.key,
@@ -897,18 +898,18 @@ export class AdminService {
     }
 
     const [users, riders, drivers, companies, trips] = await Promise.all([
-      this.userRepo.find(),
-      this.riderProfileRepo.find(),
-      this.driverProfileRepo.find(),
-      this.fleetProfileRepo.find(),
-      this.tripRepo.find(),
+      this.prisma.user.findMany(),
+      this.prisma.riderProfile.findMany(),
+      this.prisma.driverProfile.findMany(),
+      this.prisma.fleetPartnerProfile.findMany(),
+      this.prisma.trip.findMany(),
     ]);
 
     const matches = (value?: string | null) => (value ?? '').toLowerCase().includes(normalized);
 
     const userResults = users.filter((item) => matches(item.email) || matches(item.phone) || item.roles.some((role) => matches(role)));
-    const riderResults = riders.filter((item) => matches(item.fullName) || matches(item.email) || matches(item.phone) || matches(item.riderId));
-    const driverResults = drivers.filter((item) => matches(item.fullName) || matches(item.email) || matches(item.phone) || matches(item.driverId));
+    const riderResults = riders.filter((item) => matches(item.fullName) || matches(item.email) || matches(item.phone) || matches(item.userId));
+    const driverResults = drivers.filter((item) => matches(item.fullName) || matches(item.email) || matches(item.phone) || matches(item.userId));
     const companyResults = companies.filter((item) => matches(item.companyName) || matches(item.contactEmail) || matches(item.fleetId));
     const tripResults = trips.filter((item) => matches(item.id) || matches(item.riderId) || matches(item.driverId ?? '') || matches(item.status));
 
@@ -1130,10 +1131,10 @@ export class AdminService {
 
   async getHealth() {
     const [usersCount, tripsCount, companiesCount, pendingApprovalsCount] = await Promise.all([
-      this.userRepo.count(),
-      this.tripRepo.count(),
-      this.fleetProfileRepo.count(),
-      this.approvalRepo.count({ where: { status: 'pending' } }),
+      this.prisma.user.count(),
+      this.prisma.trip.count(),
+      this.prisma.fleetPartnerProfile.count(),
+      this.prisma.approval.count({ where: { status: 'pending' } }),
     ]);
 
     return {
@@ -1151,14 +1152,14 @@ export class AdminService {
 
   async getOverview() {
     const [usersCount, ridersCount, driversCount, companiesCount, tripsCount, pendingApprovalsCount, riskCasesCount, safetyIncidentsCount] = await Promise.all([
-      this.userRepo.count(),
-      this.riderProfileRepo.count(),
-      this.driverProfileRepo.count(),
-      this.fleetProfileRepo.count(),
-      this.tripRepo.count(),
-      this.approvalRepo.count({ where: { status: 'pending' } }),
-      this.riskRepo.count({ where: { status: In(['open', 'monitoring']) } }),
-      this.safetyRepo.count(),
+      this.prisma.user.count(),
+      this.prisma.riderProfile.count(),
+      this.prisma.driverProfile.count(),
+      this.prisma.fleetPartnerProfile.count(),
+      this.prisma.trip.count(),
+      this.prisma.approval.count({ where: { status: 'pending' } }),
+      this.prisma.riskCase.count({ where: { status: { in: ['open', 'monitoring'] } } }),
+      this.prisma.safetyEvent.count(),
     ]);
 
     return {
@@ -1177,67 +1178,77 @@ export class AdminService {
     };
   }
 
-  // Pricing Zone management
   async listPricingZones() {
-    return this.pricingZoneRepo.find({ order: { name: 'ASC' } });
+    return this.prisma.pricingZone.findMany({ orderBy: { name: 'asc' } });
   }
 
   async createPricingZone(
     actorId: string,
-    input: { name: string; description?: string; boundaries: Polygon; pricingRules: Record<string, unknown>; status?: string },
+    input: { name: string; description?: string; boundaries: any; pricingRules: Record<string, unknown>; status?: string },
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const zone = this.pricingZoneRepo.create({
-      ...input,
-      status: input.status ?? 'active',
-    });
-    await this.pricingZoneRepo.save(zone);
-    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'pricing_zone', zone.id, undefined, zone);
+    const id = uuidv4();
+    await this.prisma.$queryRawUnsafe(
+      `INSERT INTO pricing_zones (id, name, description, boundaries, "pricingRules", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4)::geometry(Polygon, 4326), $5, $6, NOW(), NOW())`,
+      id,
+      input.name,
+      input.description || null,
+      JSON.stringify(input.boundaries),
+      input.pricingRules as any,
+      input.status ?? 'active',
+    );
+    const zone = await this.prisma.pricingZone.findFirst({ where: { id } });
+    await this.recordAudit({ actorId, ...meta }, 'admin.create', 'pricing_zone', id, undefined, zone!);
     return zone;
   }
 
   async patchPricingZone(
     actorId: string,
     zoneId: string,
-    patch: Partial<{ name: string; description: string; boundaries: Polygon; pricingRules: Record<string, unknown>; status: string }>,
+    patch: Partial<{ name: string; description: string; boundaries: any; pricingRules: Record<string, unknown>; status: string }>,
     meta?: Omit<AuditMeta, 'actorId'>,
   ) {
-    const zone = await this.pricingZoneRepo.findOne({ where: { id: zoneId } });
+    const zone = await this.prisma.pricingZone.findFirst({ where: { id: zoneId } });
     if (!zone) {
       throw new NotFoundException('Pricing zone not found');
     }
     const before = { ...zone };
-    Object.assign(zone, this.pickDefined(patch, ['name', 'description', 'boundaries', 'pricingRules', 'status']));
-    await this.pricingZoneRepo.save(zone);
-    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'pricing_zone', zoneId, before, zone);
-    return zone;
+    const updated = await this.prisma.pricingZone.update({
+      where: { id: zoneId },
+      data: this.pickDefined(patch, ['name', 'description', 'boundaries', 'pricingRules', 'status']) as any,
+    });
+    await this.recordAudit({ actorId, ...meta }, 'admin.update', 'pricing_zone', zoneId, before, updated);
+    return updated;
   }
 
   async findPricingZoneByLocation(lat: number, lng: number) {
-    // Use raw SQL with ST_Contains for geographic point-in-polygon
-    const result = await this.pricingZoneRepo
-      .createQueryBuilder('zone')
-      .where('ST_Contains(zone.boundaries::geometry, ST_SetSRID(ST_Point(:lng, :lat), 4326))', { lat, lng })
-      .andWhere('zone.status = :status', { status: 'active' })
-      .orderBy('zone.createdAt', 'DESC')
-      .getOne();
-
-    return result ?? null;
+    const result = await this.prisma.$queryRawUnsafe<Array<any>>(
+      `SELECT * FROM pricing_zones
+       WHERE ST_Contains(boundaries::geometry, ST_SetSRID(ST_Point($1, $2), 4326))
+       AND status = 'active'
+       ORDER BY "createdAt" DESC
+       LIMIT 1`,
+      lng,
+      lat,
+    );
+    return result[0] ?? null;
   }
 
   private async recordAudit(meta: AuditMeta, action: string, resource: string, resourceId?: string, before?: object, after?: object) {
-    const audit = this.auditRepo.create({
-      actorId: meta.actorId,
-      actorType: 'admin',
-      action,
-      resource,
-      resourceId,
-      before: before as any,
-      after: after as any,
-      ipAddress: meta.ipAddress,
-      userAgent: Array.isArray(meta.userAgent) ? meta.userAgent.join(', ') : meta.userAgent,
+    const audit = await this.prisma.auditLog.create({
+      data: {
+        actorId: meta.actorId,
+        actorType: 'admin',
+        action,
+        resource,
+        resourceId,
+        before: before as any,
+        after: after as any,
+        ipAddress: meta.ipAddress,
+        userAgent: Array.isArray(meta.userAgent) ? meta.userAgent.join(', ') : meta.userAgent,
+      },
     });
-    await this.auditRepo.save(audit);
     const payload = {
       id: audit.id,
       actorId: audit.actorId,

@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { UserDocument } from '../entities/user-document.entity';
+import { PrismaService } from '../prisma/prisma.service';
+import type { UserDocument } from '@prisma/client';
 
 type UserType = 'driver' | 'rider' | 'fleet' | 'admin';
 type ExpiryStatus = 'valid' | 'expiring_soon' | 'expired';
@@ -22,40 +21,43 @@ const REQUIRED_DOCUMENT_TYPES: Record<UserType, readonly string[]> = {
 
 @Injectable()
 export class DocumentsService {
-  constructor(
-    @InjectRepository(UserDocument) private documentRepo: Repository<UserDocument>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async upsertForUser(userType: UserType, userId: string, input: { documentType: string; fileUrl: string; expiryDate: string }) {
     this.ensureFutureDate(input.expiryDate);
-    
-    let doc = await this.documentRepo.findOne({
+
+    const existing = await this.prisma.userDocument.findFirst({
       where: { userType, userId, documentType: input.documentType },
     });
 
-    if (doc) {
-      doc.fileUrl = input.fileUrl;
-      doc.expiryDate = input.expiryDate;
-      doc.status = 'under_review';
-      doc.rejectionReason = null;
-    } else {
-      doc = this.documentRepo.create({
+    if (existing) {
+      return this.prisma.userDocument.update({
+        where: { id: existing.id },
+        data: {
+          fileUrl: input.fileUrl,
+          expiryDate: input.expiryDate,
+          status: 'under_review',
+          rejectionReason: null,
+        },
+      });
+    }
+
+    return this.prisma.userDocument.create({
+      data: {
         userType,
         userId,
         documentType: input.documentType,
         fileUrl: input.fileUrl,
         expiryDate: input.expiryDate,
         status: 'under_review',
-      });
-    }
-
-    return this.documentRepo.save(doc);
+      },
+    });
   }
 
   async listForUser(userType: UserType, userId: string) {
-    return this.documentRepo.find({
+    return this.prisma.userDocument.findMany({
       where: { userType, userId },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -70,22 +72,23 @@ export class DocumentsService {
     documentId: string,
     patch: Partial<{ status: string; rejectionReason: string; fileUrl: string; expiryDate: string }>,
   ) {
-    const doc = await this.documentRepo.findOne({
+    const doc = await this.prisma.userDocument.findFirst({
       where: { id: documentId, userId, userType },
     });
     if (!doc) {
       throw new NotFoundException('Document not found');
     }
 
+    const data: Record<string, unknown> = {};
     if (patch.expiryDate) {
       this.ensureFutureDate(patch.expiryDate);
-      doc.expiryDate = patch.expiryDate;
+      data.expiryDate = patch.expiryDate;
     }
-    if (patch.fileUrl) doc.fileUrl = patch.fileUrl;
-    if (patch.status) doc.status = patch.status;
-    if (patch.rejectionReason !== undefined) doc.rejectionReason = patch.rejectionReason;
+    if (patch.fileUrl) data.fileUrl = patch.fileUrl;
+    if (patch.status) data.status = patch.status;
+    if (patch.rejectionReason !== undefined) data.rejectionReason = patch.rejectionReason;
 
-    return this.documentRepo.save(doc);
+    return this.prisma.userDocument.update({ where: { id: documentId }, data });
   }
 
   async resubmitForUser(userType: UserType, userId: string, documentId: string, input: { fileUrl?: string; expiryDate?: string }) {
@@ -97,13 +100,13 @@ export class DocumentsService {
   }
 
   async deleteForUser(userType: UserType, userId: string, documentId: string) {
-    const doc = await this.documentRepo.findOne({
+    const doc = await this.prisma.userDocument.findFirst({
       where: { id: documentId, userId, userType },
     });
     if (!doc) {
       throw new NotFoundException('Document not found');
     }
-    await this.documentRepo.remove(doc);
+    await this.prisma.userDocument.delete({ where: { id: documentId } });
     return { deleted: true };
   }
 

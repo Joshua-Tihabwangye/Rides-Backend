@@ -1,12 +1,8 @@
 import { Injectable, UnauthorizedException, ConflictException, NotFoundException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { randomBytes, randomInt } from 'crypto';
-import { User } from '../entities/user.entity';
-import { Role } from '../entities/role.entity';
-import { UserRole } from '../entities/user-role.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { getJwtSecret } from './jwt-secret';
 
@@ -18,12 +14,7 @@ export class AuthService {
   private readonly REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
   constructor(
-    @InjectRepository(User)
-    private userRepo: Repository<User>,
-    @InjectRepository(Role)
-    private roleRepo: Repository<Role>,
-    @InjectRepository(UserRole)
-    private userRoleRepo: Repository<UserRole>,
+    private readonly prisma: PrismaService,
     private redis: RedisService,
   ) {}
 
@@ -35,7 +26,7 @@ export class AuthService {
     lastName?: string;
     roles?: Array<'rider' | 'driver' | 'fleet_owner'>;
   }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
-    const existing = await this.userRepo.findOne({ where: { email: data.email } });
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
       throw new ConflictException('EMAIL_ALREADY_EXISTS');
     }
@@ -45,29 +36,32 @@ export class AuthService {
     const defaultRoles = [requestedRole ?? 'rider'];
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
-    const user = this.userRepo.create({
-      email: data.email,
-      password: hashedPassword,
-      phone: data.phone,
-      roles: defaultRoles,
+    const user = await this.prisma.user.create({
+      data: {
+        email: data.email,
+        password: hashedPassword,
+        phone: data.phone,
+        roles: defaultRoles,
+      },
     });
-    await this.userRepo.save(user);
 
     for (const roleName of defaultRoles) {
-      const role = await this.roleRepo.findOne({ where: { name: roleName } });
+      const role = await this.prisma.role.findUnique({ where: { name: roleName } });
       if (role) {
-        await this.userRoleRepo.save({ user, role });
+        await this.prisma.userRole.create({
+          data: { userId: user.id, roleId: role.id },
+        });
       }
     }
 
     this.logger.log(`User registered: ${user.email} with roles [${defaultRoles.join(', ')}]`);
-    return this.generateTokens(user);
+    return this.generateTokens(user.id, user.email, defaultRoles);
   }
 
   async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: any }> {
-    const user = await this.userRepo.findOne({
+    const user = await this.prisma.user.findUnique({
       where: { email },
-      relations: ['userRoles', 'userRoles.role'],
+      include: { userRoles: { include: { role: true } } },
     });
     if (!user) {
       throw new UnauthorizedException('INVALID_CREDENTIALS');
@@ -78,7 +72,8 @@ export class AuthService {
       throw new UnauthorizedException('INVALID_CREDENTIALS');
     }
 
-    return this.generateTokens(user);
+    const roles = user.userRoles?.map((ur) => ur.role.name) || user.roles || [];
+    return this.generateTokens(user.id, user.email, roles);
   }
 
   async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; user: any }> {
@@ -87,16 +82,17 @@ export class AuthService {
       throw new UnauthorizedException('INVALID_REFRESH_TOKEN');
     }
 
-    const user = await this.userRepo.findOne({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      relations: ['userRoles', 'userRoles.role'],
+      include: { userRoles: { include: { role: true } } },
     });
     if (!user) {
       throw new UnauthorizedException('USER_NOT_FOUND');
     }
 
     await this.redis.del(`refresh:${refreshToken}`);
-    return this.generateTokens(user);
+    const roles = user.userRoles?.map((ur) => ur.role.name) || user.roles || [];
+    return this.generateTokens(user.id, user.email, roles);
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -104,7 +100,7 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string): Promise<{ sent: boolean }> {
-    const user = await this.userRepo.findOne({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       return { sent: true };
     }
@@ -137,33 +133,30 @@ export class AuthService {
     // OTP valid, consume it
     await this.redis.del(key);
 
-    const user = await this.userRepo.findOne({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new NotFoundException('USER_NOT_FOUND');
     }
-    user.password = await bcrypt.hash(newPassword, 12);
-    await this.userRepo.save(user);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: user.id }, data: { password: hashedPassword } });
 
     this.logger.log(`Password reset for ${email}`);
 
     return { reset: true };
   }
 
-  private async generateTokens(user: User): Promise<{ accessToken: string; refreshToken: string; user: any }> {
-    const relationRoles = user.userRoles?.map((ur) => ur.role.name) ?? [];
-    const roles = relationRoles.length ? relationRoles : (user.roles ?? []);
-    const payload = { sub: user.id, email: user.email, roles };
+  private async generateTokens(userId: string, email: string, roles: string[]): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+    const payload = { sub: userId, email, roles };
 
     const accessToken = jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN as any });
     const refreshToken = randomBytes(48).toString('hex');
 
     const refreshTtl = 7 * 24 * 60 * 60; // 7 days
-    await this.redis.set(`refresh:${refreshToken}`, user.id, refreshTtl);
+    await this.redis.set(`refresh:${refreshToken}`, userId, refreshTtl);
 
     const userResponse = {
-      id: user.id,
-      email: user.email,
-      phone: user.phone,
+      id: userId,
+      email,
       roles,
     };
 

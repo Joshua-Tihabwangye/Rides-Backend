@@ -10,69 +10,156 @@ export declare class SafetyController {
     getSafetyState(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         tripId: string;
         temporaryStop: {
-            status: "stop_requested" | "temporarily_stopped" | "idle";
-            requestNote: string | undefined;
+            status: any;
+            requestNote: any;
         };
         safetyCheck: {
-            status: string;
-            driverAction: "sos" | "okay" | null;
-            passengerAction: "sos" | "okay" | null;
+            status: any;
+            driverAction: any;
+            passengerAction: any;
         };
         lastEmergencyDispatch: {
             id: string;
             tripId: string;
-            triggeredBy: "driver" | "passenger";
+            triggeredBy: any;
             triggeredAt: number;
-            contactsNotified: string[];
+            contactsNotified: any;
             location: {
                 latitude: number;
                 longitude: number;
-                accuracy: number | undefined;
+                accuracy: any;
                 timestamp: number;
             } | null;
-            helpMessage: string | undefined;
+            helpMessage: any;
         } | null;
         updatedAt: number;
     }>>;
     saveSafetyState(user: AuthenticatedUser, tripId: string, body: Record<string, unknown>, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         tripId: string;
         temporaryStop: {
-            status: "stop_requested" | "temporarily_stopped" | "idle";
-            requestNote: string | undefined;
+            status: any;
+            requestNote: any;
         };
         safetyCheck: {
-            status: string;
-            driverAction: "sos" | "okay" | null;
-            passengerAction: "sos" | "okay" | null;
+            status: any;
+            driverAction: any;
+            passengerAction: any;
         };
         lastEmergencyDispatch: {
             id: string;
             tripId: string;
-            triggeredBy: "driver" | "passenger";
+            triggeredBy: any;
             triggeredAt: number;
-            contactsNotified: string[];
+            contactsNotified: any;
             location: {
                 latitude: number;
                 longitude: number;
-                accuracy: number | undefined;
+                accuracy: any;
                 timestamp: number;
             } | null;
-            helpMessage: string | undefined;
+            helpMessage: any;
         } | null;
         updatedAt: number;
     }>>;
-    temporaryStopRequest(user: AuthenticatedUser, tripId: string, body: TemporaryStopRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    temporaryStopRequestCompat(user: AuthenticatedUser, tripId: string, body: TemporaryStopRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    temporaryStopRespond(user: AuthenticatedUser, tripId: string, body: TemporaryStopRespondDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    temporaryStopRespondCompat(user: AuthenticatedUser, tripId: string, body: TemporaryStopRespondDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    temporaryStopResume(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    temporaryStopResumeCompat(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    safetyCheckRespond(user: AuthenticatedUser, tripId: string, body: SafetyCheckRespondDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    sos(user: AuthenticatedUser, tripId: string, body: SosDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    sosCompat(user: AuthenticatedUser, tripId: string, body: SosDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/safety-event.entity").SafetyEvent>>;
-    listEmergencyContacts(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/emergency-contact.entity").EmergencyContact[]>>;
-    createEmergencyContact(user: AuthenticatedUser, body: EmergencyContactDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/emergency-contact.entity").EmergencyContact>>;
-    patchEmergencyContact(user: AuthenticatedUser, contactId: string, body: EmergencyContactDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/emergency-contact.entity").EmergencyContact>>;
+    temporaryStopRequest(user: AuthenticatedUser, tripId: string, body: TemporaryStopRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    temporaryStopRequestCompat(user: AuthenticatedUser, tripId: string, body: TemporaryStopRequestDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    temporaryStopRespond(user: AuthenticatedUser, tripId: string, body: TemporaryStopRespondDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    temporaryStopRespondCompat(user: AuthenticatedUser, tripId: string, body: TemporaryStopRespondDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    temporaryStopResume(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    temporaryStopResumeCompat(user: AuthenticatedUser, tripId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    safetyCheckRespond(user: AuthenticatedUser, tripId: string, body: SafetyCheckRespondDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    sos(user: AuthenticatedUser, tripId: string, body: SosDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    sosCompat(user: AuthenticatedUser, tripId: string, body: SosDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>>;
+    listEmergencyContacts(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string;
+        name: string;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        relationship: string | null;
+    }[]>>;
+    createEmergencyContact(user: AuthenticatedUser, body: EmergencyContactDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string;
+        name: string;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        relationship: string | null;
+    }>>;
+    patchEmergencyContact(user: AuthenticatedUser, contactId: string, body: EmergencyContactDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string;
+        name: string;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        relationship: string | null;
+    }>>;
     deleteEmergencyContact(user: AuthenticatedUser, contactId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         deleted: boolean;
     }>>;

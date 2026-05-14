@@ -1,7 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { DriverProfile } from '../entities/driver-profile.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { DriverProfileService } from '../driver-profile/driver-profile.service';
 
 export interface NearbyDriverRecord {
@@ -16,9 +14,8 @@ export interface NearbyDriverRecord {
 @Injectable()
 export class PresenceLocationService {
   constructor(
-    @InjectRepository(DriverProfile) private driverProfileRepo: Repository<DriverProfile>,
+    private readonly prisma: PrismaService,
     private readonly driverProfileService: DriverProfileService,
-    private readonly dataSource: DataSource,
   ) {}
 
   async goOnline(driverId: string) {
@@ -37,23 +34,26 @@ export class PresenceLocationService {
       throw new BadRequestException(`Onboarding incomplete: ${missing.join(', ')}`);
     }
 
-    const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
     if (!profile) {
       throw new BadRequestException('Driver profile not found');
     }
 
-    profile.status = 'online';
-    profile.onboardingStatus = 'complete';
-    await this.driverProfileRepo.save(profile);
-    
+    await this.prisma.driverProfile.update({
+      where: { id: profile.id },
+      data: { status: 'online', onboardingStatus: 'complete' },
+    });
+
     return { status: 'online' };
   }
 
   async goOffline(driverId: string) {
-    const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
     if (profile) {
-      profile.status = 'offline';
-      await this.driverProfileRepo.save(profile);
+      await this.prisma.driverProfile.update({
+        where: { id: profile.id },
+        data: { status: 'offline' },
+      });
     }
     return { status: 'offline' };
   }
@@ -62,19 +62,16 @@ export class PresenceLocationService {
     driverId: string,
     input: { latitude: number; longitude: number; accuracy?: number; timestamp?: number },
   ) {
-    const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
     if (!profile) {
       throw new BadRequestException('Driver profile not found');
     }
 
-    // PostGIS point: ST_SetSRID(ST_MakePoint(lng, lat), 4326)
-    // We can use raw query or try to use TypeORM spatial support if configured.
-    // Given the previous implementation used raw query for findNearby, let's use raw for update too or standard TypeORM if possible.
-    // Actually, let's just use raw update for currentLocation to be sure about SRID.
-    
-    await this.dataSource.query(
-      `UPDATE driver_profiles SET current_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography WHERE user_id = $3`,
-      [input.longitude, input.latitude, driverId]
+    await this.prisma.$queryRawUnsafe(
+      `UPDATE driver_profiles SET current_location = ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography WHERE id = $3`,
+      input.longitude,
+      input.latitude,
+      profile.id,
     );
 
     return {
@@ -90,7 +87,7 @@ export class PresenceLocationService {
     driverId: string,
     input: { latitude: number; longitude: number; accuracy?: number; timestamp?: number },
   ) {
-    const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
     if (!profile || profile.status !== 'online') {
       throw new BadRequestException('Driver must be online to send heartbeat');
     }
@@ -98,7 +95,7 @@ export class PresenceLocationService {
   }
 
   async findNearbyDrivers(latitude: number, longitude: number, radiusMeters: number): Promise<NearbyDriverRecord[]> {
-    const rows = await this.dataSource.query(
+    const rows = await this.prisma.$queryRawUnsafe<Array<any>>(
       `
         SELECT
           dp.user_id AS "driverId",
@@ -118,7 +115,9 @@ export class PresenceLocationService {
           )
         ORDER BY "distanceMeters" ASC
       `,
-      [longitude, latitude, radiusMeters],
+      longitude,
+      latitude,
+      radiusMeters,
     );
 
     return rows.map((row: any) => ({

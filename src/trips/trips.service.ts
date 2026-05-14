@@ -1,12 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
-import { Trip, TripStatus } from '../entities/trip.entity';
-import { JobOffer } from '../entities/job-offer.entity';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { WalletAccount } from '../entities/wallet-account.entity';
+import { TripStatus } from '@prisma/client';
 
 const TRANSITIONS: Record<TripStatus, TripStatus[]> = {
   requested: ['driver_assigned', 'cancelled'],
@@ -21,35 +17,29 @@ const TRANSITIONS: Record<TripStatus, TripStatus[]> = {
 @Injectable()
 export class TripsService {
   constructor(
-    @InjectRepository(Trip) private tripRepo: Repository<Trip>,
-    @InjectRepository(JobOffer) private jobOfferRepo: Repository<JobOffer>,
-    @InjectRepository(EarningsLedger) private earningsLedgerRepo: Repository<EarningsLedger>,
-    @InjectRepository(WalletAccount) private walletRepo: Repository<WalletAccount>,
+    private readonly prisma: PrismaService,
     @Optional() private readonly realtimeGateway?: RealtimeGateway,
     @Optional() private readonly riderRealtimeGateway?: RiderRealtimeGateway,
   ) {}
 
   async getActive(driverId: string) {
-    const trip = await this.tripRepo.findOne({
-      where: [
-        { driverId, status: 'driver_assigned' },
-        { driverId, status: 'driver_arriving' },
-        { driverId, status: 'arrived' },
-        { driverId, status: 'in_progress' },
-      ],
+    return this.prisma.trip.findFirst({
+      where: {
+        driverId,
+        status: { in: ['driver_assigned', 'driver_arriving', 'arrived', 'in_progress'] },
+      },
     });
-    return trip ?? null;
   }
 
   async list(driverId: string, query: { type?: string; status?: string; cursor?: string }) {
-    const where: any = { driverId };
+    const where: Record<string, unknown> = { driverId };
     if (query.type) where.type = query.type;
     if (query.status) where.status = query.status;
 
-    const trips = await this.tripRepo.find({
+    const trips = await this.prisma.trip.findMany({
       where,
       take: 50,
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
 
     return {
@@ -65,10 +55,12 @@ export class TripsService {
 
   async arrive(driverId: string, tripId: string) {
     const trip = await this.transition(driverId, tripId, 'arrived');
-    trip.driverArrivedAt = new Date();
-    await this.tripRepo.save(trip);
-    this.publishTripEvent(trip, 'trip.arrived');
-    return trip;
+    const updated = await this.prisma.trip.update({
+      where: { id: tripId },
+      data: { driverArrivedAt: new Date() },
+    });
+    this.publishTripEvent(updated, 'trip.arrived');
+    return updated;
   }
 
   async verifyRider(driverId: string, tripId: string, otp: string) {
@@ -80,70 +72,86 @@ export class TripsService {
     if (trip.otpCode !== otp) {
       throw new BadRequestException('Invalid rider OTP');
     }
-    trip.rating = { riderVerifiedAt: Date.now() }; // Temporary mapping to save it
-    await this.tripRepo.save(trip);
-    this.publishTripEvent(trip, 'trip.rider.verified');
-    return trip;
+    const updated = await this.prisma.trip.update({
+      where: { id: tripId },
+      data: { rating: { riderVerifiedAt: Date.now() } as any },
+    });
+    this.publishTripEvent(updated, 'trip.rider.verified');
+    return updated;
   }
 
   async start(driverId: string, tripId: string) {
     const trip = await this.getById(driverId, tripId);
-    if (!trip.rating?.riderVerifiedAt && trip.type !== 'delivery') {
+    const rating = trip.rating as any;
+    if (!rating?.riderVerifiedAt && trip.type !== 'delivery') {
       // NOTE: Temporarily checking rating.riderVerifiedAt until we migrate column
     }
     const nextTrip = await this.transition(driverId, tripId, 'in_progress');
-    nextTrip.startedAt = new Date();
-    await this.tripRepo.save(nextTrip);
-    this.publishTripEvent(nextTrip, 'trip.started');
-    return nextTrip;
+    const updated = await this.prisma.trip.update({
+      where: { id: tripId },
+      data: { startedAt: new Date() },
+    });
+    this.publishTripEvent(updated, 'trip.started');
+    return updated;
   }
 
   async complete(driverId: string, tripId: string) {
     const trip = await this.transition(driverId, tripId, 'completed');
-    trip.completedAt = new Date();
-    await this.tripRepo.save(trip);
-    
-    const earning = this.earningsLedgerRepo.create({
-      userId: driverId,
-      tripId,
-      amount: 12000,
-      type: 'trip_fare',
+    const updated = await this.prisma.trip.update({
+      where: { id: tripId },
+      data: { completedAt: new Date() },
     });
-    await this.earningsLedgerRepo.save(earning);
-    
-    const wallet = await this.walletRepo.findOne({ where: { userId: driverId } });
+
+    await this.prisma.earningsLedger.create({
+      data: {
+        userId: driverId,
+        driverId,
+        tripId,
+        amount: 12000,
+        type: 'trip_fare',
+      },
+    });
+
+    const wallet = await this.prisma.walletAccount.findFirst({ where: { userId: driverId } });
     if (wallet) {
-      wallet.balance = Number(wallet.balance) + 12000;
-      await this.walletRepo.save(wallet);
+      await this.prisma.walletAccount.update({
+        where: { id: wallet.id },
+        data: { balance: Number(wallet.balance) + 12000 },
+      });
     }
 
-    this.publishTripEvent(trip, 'trip.completed');
-    return trip;
+    this.publishTripEvent(updated, 'trip.completed');
+    return updated;
   }
 
   async cancel(driverId: string, tripId: string, reason: string, details?: string, cancelledBy = 'driver') {
     const trip = await this.transition(driverId, tripId, 'cancelled');
-    trip.cancelledAt = new Date();
-    trip.cancellationReason = {
-      reason,
-      details: details ?? '',
-      cancelledBy,
-      cancelledAt: Date.now(),
-    };
-    await this.tripRepo.save(trip);
-    this.publishTripEvent(trip, 'trip.cancelled');
-    return trip;
+    const updated = await this.prisma.trip.update({
+      where: { id: tripId },
+      data: {
+        cancelledAt: new Date(),
+        cancellationReason: {
+          reason,
+          details: details ?? '',
+          cancelledBy,
+          cancelledAt: Date.now(),
+        } as any,
+      },
+    });
+    this.publishTripEvent(updated, 'trip.cancelled');
+    return updated;
   }
 
   async assignDriver(driverId: string, tripId: string, jobId: string) {
-    const trip = await this.tripRepo.findOne({ where: { id: tripId } });
+    const trip = await this.prisma.trip.findUnique({ where: { id: tripId } });
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
 
-    trip.driverId = driverId;
-    trip.route = { ...trip.route, jobId }; // Store jobId in route temporarily
-    await this.tripRepo.save(trip);
+    await this.prisma.trip.update({
+      where: { id: tripId },
+      data: { driverId, route: { ...trip.route as any, jobId } },
+    });
     const assignedTrip = await this.transition(driverId, tripId, 'driver_assigned');
     this.publishTripEvent(assignedTrip, 'trip.driver.assigned');
     return assignedTrip;
@@ -156,14 +164,14 @@ export class TripsService {
   }
 
   private async getJobForDriver(driverId: string, jobId: string) {
-    const job = await this.jobOfferRepo.findOne({ where: { id: jobId, driverId } });
+    const job = await this.prisma.jobOffer.findFirst({ where: { id: jobId, driverId } });
     if (!job) {
       throw new NotFoundException('Job not found');
     }
     return job;
   }
 
-  private publishTripEvent(trip: Trip, event: string) {
+  private publishTripEvent(trip: any, event: string) {
     const payload = {
       tripId: trip.id,
       driverId: trip.driverId,
@@ -187,20 +195,18 @@ export class TripsService {
     if (!allowed.includes(next)) {
       throw new BadRequestException(`Invalid trip state transition from ${trip.status} to ${next}`);
     }
-    trip.status = next;
-    return this.tripRepo.save(trip);
+    return this.prisma.trip.update({ where: { id: tripId }, data: { status: next } });
   }
 
-  private async ensureDriverMatch(trip: Trip, driverId: string) {
+  private async ensureDriverMatch(trip: any, driverId: string) {
     if (trip.driverId && trip.driverId !== driverId) {
       throw new NotFoundException('Trip not found');
     }
-    trip.driverId = driverId;
-    return this.tripRepo.save(trip);
+    return this.prisma.trip.update({ where: { id: trip.id }, data: { driverId } });
   }
 
   async getByIdOrPending(driverId: string, tripId: string) {
-    const trip = await this.tripRepo.findOne({ where: { id: tripId } });
+    const trip = await this.prisma.trip.findUnique({ where: { id: tripId } });
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
@@ -208,20 +214,21 @@ export class TripsService {
   }
 
   async getById(driverId: string, tripId: string) {
-    const trip = await this.tripRepo.findOne({ where: { id: tripId, driverId } });
+    const trip = await this.prisma.trip.findFirst({ where: { id: tripId, driverId } });
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
     return trip;
   }
 
-  async hydrateTripFromJob(job: JobOffer) {
-    const trip = await this.tripRepo.findOne({ where: { id: job.tripId } });
+  async hydrateTripFromJob(job: any) {
+    const trip = await this.prisma.trip.findUnique({ where: { id: job.tripId } });
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
-    trip.driverId = job.driverId;
-    trip.route = { ...trip.route, jobId: job.id };
-    return this.tripRepo.save(trip);
+    return this.prisma.trip.update({
+      where: { id: trip.id },
+      data: { driverId: job.driverId, route: { ...trip.route as any, jobId: job.id } },
+    });
   }
 }

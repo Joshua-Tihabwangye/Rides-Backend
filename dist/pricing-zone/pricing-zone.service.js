@@ -8,58 +8,50 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PricingZoneService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const pricing_zone_entity_1 = require("../entities/pricing-zone.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
+const uuid_1 = require("uuid");
 let PricingZoneService = class PricingZoneService {
-    constructor(pricingZoneRepo) {
-        this.pricingZoneRepo = pricingZoneRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
     }
     async listZones() {
-        return this.pricingZoneRepo.find({ order: { name: 'ASC' } });
+        return this.prisma.pricingZone.findMany({ orderBy: { name: 'asc' } });
     }
     async createZone(input) {
-        const zone = this.pricingZoneRepo.create({
-            ...input,
-            status: input.status ?? 'active',
-        });
-        return this.pricingZoneRepo.save(zone);
+        const id = (0, uuid_1.v4)();
+        await this.prisma.$queryRawUnsafe(`INSERT INTO pricing_zones (id, name, description, boundaries, "pricingRules", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4)::geometry(Polygon, 4326), $5, $6, NOW(), NOW())`, id, input.name, input.description || null, JSON.stringify(input.boundaries), input.pricingRules, input.status ?? 'active');
+        return this.prisma.pricingZone.findFirst({ where: { id } });
     }
     async patchZone(zoneId, patch) {
-        const zone = await this.pricingZoneRepo.findOne({ where: { id: zoneId } });
+        const zone = await this.prisma.pricingZone.findUnique({ where: { id: zoneId } });
         if (!zone) {
             throw new common_1.NotFoundException('Pricing zone not found');
         }
-        Object.assign(zone, patch);
-        return this.pricingZoneRepo.save(zone);
+        return this.prisma.pricingZone.update({ where: { id: zoneId }, data: patch });
     }
     async getZone(zoneId) {
-        const zone = await this.pricingZoneRepo.findOne({ where: { id: zoneId } });
+        const zone = await this.prisma.pricingZone.findUnique({ where: { id: zoneId } });
         if (!zone) {
             throw new common_1.NotFoundException('Pricing zone not found');
         }
         return zone;
     }
     async findZoneByLocation(lat, lng) {
-        const result = await this.pricingZoneRepo
-            .createQueryBuilder('zone')
-            .where('ST_Contains(zone.boundaries, ST_SetSRID(ST_Point(:lng, :lat), 4326))', { lat, lng })
-            .andWhere('zone.status = :status', { status: 'active' })
-            .orderBy('zone.createdAt', 'DESC')
-            .getOne();
-        return result ?? null;
+        const result = await this.prisma.$queryRawUnsafe(`SELECT * FROM pricing_zones
+       WHERE ST_Contains(boundaries, ST_SetSRID(ST_Point($1, $2), 4326))
+       AND status = 'active'
+       ORDER BY "createdAt" DESC
+       LIMIT 1`, lng, lat);
+        return result[0] ?? null;
     }
 };
 exports.PricingZoneService = PricingZoneService;
 exports.PricingZoneService = PricingZoneService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(pricing_zone_entity_1.PricingZone)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], PricingZoneService);
 //# sourceMappingURL=pricing-zone.service.js.map

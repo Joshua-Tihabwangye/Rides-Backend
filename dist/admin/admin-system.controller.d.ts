@@ -7,9 +7,37 @@ export declare class AdminSystemController {
     private readonly adminService;
     private readonly apiResponse;
     constructor(adminService: AdminService, apiResponse: ApiResponseService);
-    getAuditLog(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/audit-log.entity").AuditLog[]>>;
-    getFlags(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/feature-flag.entity").FeatureFlag[]>>;
-    patchFlag(user: AuthenticatedUser, flagKey: string, body: UpdateFeatureFlagDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/feature-flag.entity").FeatureFlag>>;
+    getAuditLog(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        id: string;
+        createdAt: Date;
+        actorId: string;
+        ipAddress: string | null;
+        userAgent: string | null;
+        actorType: string;
+        action: string;
+        resource: string;
+        resourceId: string | null;
+        before: import("@prisma/client/runtime/client").JsonValue | null;
+        after: import("@prisma/client/runtime/client").JsonValue | null;
+    }[]>>;
+    getFlags(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        description: string | null;
+        key: string;
+        enabled: boolean;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scope: import(".prisma/client").$Enums.FeatureFlagScope;
+    }[]>>;
+    patchFlag(user: AuthenticatedUser, flagKey: string, body: UpdateFeatureFlagDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        description: string | null;
+        key: string;
+        enabled: boolean;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scope: import(".prisma/client").$Enums.FeatureFlagScope;
+    }>>;
     getHealth(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         status: string;
         service: string;

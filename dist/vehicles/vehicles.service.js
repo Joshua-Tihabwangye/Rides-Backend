@@ -8,90 +8,84 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VehiclesService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const vehicle_entity_1 = require("../entities/vehicle.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 let VehiclesService = class VehiclesService {
-    constructor(vehicleRepo) {
-        this.vehicleRepo = vehicleRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
     }
     async list(driverId) {
-        return this.vehicleRepo.find({ where: { driverId } });
+        return this.prisma.vehicle.findMany({ where: { driverId } });
     }
     async listFleet(fleetId) {
-        return this.vehicleRepo.find({ where: { fleetPartnerId: fleetId } });
+        return this.prisma.vehicle.findMany({ where: { fleetPartnerId: fleetId } });
     }
     async createFleet(fleetId, input) {
-        const created = this.vehicleRepo.create({
-            fleetPartnerId: fleetId,
-            driverId: null,
-            make: input.make,
-            model: input.model,
-            year: input.year,
-            licensePlate: input.plate,
-            type: input.type,
-            status: input.status,
-            accessories: input.accessories ?? {},
+        return this.prisma.vehicle.create({
+            data: {
+                fleetPartnerId: fleetId,
+                driverId: '',
+                make: input.make,
+                model: input.model,
+                year: input.year,
+                licensePlate: input.plate,
+                type: input.type,
+                status: input.status,
+                accessories: input.accessories ?? {},
+            },
         });
-        return this.vehicleRepo.save(created);
     }
     async create(driverId, input) {
-        const created = this.vehicleRepo.create({
-            driverId,
-            make: input.make,
-            model: input.model,
-            year: input.year,
-            licensePlate: input.plate,
-            type: input.type,
-            status: input.status,
-            accessories: input.accessories ?? {},
+        return this.prisma.vehicle.create({
+            data: {
+                driverId,
+                make: input.make,
+                model: input.model,
+                year: input.year,
+                licensePlate: input.plate,
+                type: input.type,
+                status: input.status,
+                accessories: input.accessories ?? {},
+            },
         });
-        return this.vehicleRepo.save(created);
     }
     async findById(driverId, vehicleId) {
-        const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, driverId } });
+        const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, driverId } });
         if (!vehicle) {
             throw new common_1.NotFoundException('Vehicle not found');
         }
         return vehicle;
     }
     async findFleetVehicleById(fleetId, vehicleId) {
-        const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetPartnerId: fleetId } });
+        const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetPartnerId: fleetId } });
         if (!vehicle) {
             throw new common_1.NotFoundException('Vehicle not found');
         }
         return vehicle;
     }
     async update(driverId, vehicleId, patch) {
-        const vehicle = await this.findById(driverId, vehicleId);
-        Object.assign(vehicle, patch);
-        return this.vehicleRepo.save(vehicle);
+        await this.findById(driverId, vehicleId);
+        return this.prisma.vehicle.update({ where: { id: vehicleId }, data: patch });
     }
     async updateFleet(fleetId, vehicleId, patch) {
-        const vehicle = await this.findFleetVehicleById(fleetId, vehicleId);
-        Object.assign(vehicle, patch);
-        return this.vehicleRepo.save(vehicle);
+        await this.findFleetVehicleById(fleetId, vehicleId);
+        return this.prisma.vehicle.update({ where: { id: vehicleId }, data: patch });
     }
     async remove(driverId, vehicleId) {
-        const vehicle = await this.findById(driverId, vehicleId);
-        await this.vehicleRepo.remove(vehicle);
+        await this.findById(driverId, vehicleId);
+        await this.prisma.vehicle.delete({ where: { id: vehicleId } });
         return { deleted: true };
     }
     async removeFleet(fleetId, vehicleId) {
-        const vehicle = await this.findFleetVehicleById(fleetId, vehicleId);
-        await this.vehicleRepo.remove(vehicle);
+        await this.findFleetVehicleById(fleetId, vehicleId);
+        await this.prisma.vehicle.delete({ where: { id: vehicleId } });
         return { deleted: true };
     }
     async patchAccessories(driverId, vehicleId, accessories) {
-        const vehicle = await this.findById(driverId, vehicleId);
-        vehicle.accessories = accessories;
-        return this.vehicleRepo.save(vehicle);
+        await this.findById(driverId, vehicleId);
+        return this.prisma.vehicle.update({ where: { id: vehicleId }, data: { accessories } });
     }
     async uploadDocument(driverId, vehicleId, input) {
         const vehicle = await this.findById(driverId, vehicleId);
@@ -102,15 +96,13 @@ let VehiclesService = class VehiclesService {
             status: 'under_review',
             updatedAt: Date.now(),
         };
-        vehicle.documents = documents;
-        await this.vehicleRepo.save(vehicle);
+        await this.prisma.vehicle.update({ where: { id: vehicleId }, data: { documents } });
         return documents[input.documentType];
     }
 };
 exports.VehiclesService = VehiclesService;
 exports.VehiclesService = VehiclesService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(vehicle_entity_1.Vehicle)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], VehiclesService);
 //# sourceMappingURL=vehicles.service.js.map

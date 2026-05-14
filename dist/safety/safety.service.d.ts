@@ -1,89 +1,143 @@
-import { Repository } from 'typeorm';
-import { SafetyEvent } from '../entities/safety-event.entity';
-import { EmergencyContact } from '../entities/emergency-contact.entity';
-import { DriverProfile } from '../entities/driver-profile.entity';
+import { PrismaService } from '../prisma/prisma.service';
 export declare class SafetyService {
-    private safetyEventRepo;
-    private emergencyContactRepo;
-    private driverProfileRepo;
+    private readonly prisma;
     private readonly shareContactsStore;
     private readonly trainingModuleStore;
-    constructor(safetyEventRepo: Repository<SafetyEvent>, emergencyContactRepo: Repository<EmergencyContact>, driverProfileRepo: Repository<DriverProfile>);
-    requestTemporaryStop(driverId: string, tripId: string, note?: string): Promise<SafetyEvent>;
-    respondTemporaryStop(driverId: string, tripId: string, decision: 'confirm' | 'decline'): Promise<SafetyEvent>;
-    resumeTemporaryStop(driverId: string, tripId: string): Promise<SafetyEvent>;
-    respondSafetyCheck(driverId: string, tripId: string, actor: 'driver' | 'passenger', action: 'okay' | 'sos'): Promise<SafetyEvent>;
+    constructor(prisma: PrismaService);
+    requestTemporaryStop(driverId: string, tripId: string, note?: string): Promise<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>;
+    respondTemporaryStop(driverId: string, tripId: string, decision: 'confirm' | 'decline'): Promise<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>;
+    resumeTemporaryStop(driverId: string, tripId: string): Promise<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>;
+    respondSafetyCheck(driverId: string, tripId: string, actor: 'driver' | 'passenger', action: 'okay' | 'sos'): Promise<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>;
     triggerSos(driverId: string, tripId: string, payload: {
         contactsNotified?: string[];
         latitude?: number;
         longitude?: number;
         helpMessage?: string;
-    }): Promise<SafetyEvent>;
+    }): Promise<{
+        type: import(".prisma/client").$Enums.SafetyEventType;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        tripId: string;
+        payload: import("@prisma/client/runtime/client").JsonValue | null;
+    }>;
     getTripSafetyState(driverId: string, tripId: string): Promise<{
         tripId: string;
         temporaryStop: {
-            status: "stop_requested" | "temporarily_stopped" | "idle";
-            requestNote: string | undefined;
+            status: any;
+            requestNote: any;
         };
         safetyCheck: {
-            status: string;
-            driverAction: "sos" | "okay" | null;
-            passengerAction: "sos" | "okay" | null;
+            status: any;
+            driverAction: any;
+            passengerAction: any;
         };
         lastEmergencyDispatch: {
             id: string;
             tripId: string;
-            triggeredBy: "driver" | "passenger";
+            triggeredBy: any;
             triggeredAt: number;
-            contactsNotified: string[];
+            contactsNotified: any;
             location: {
                 latitude: number;
                 longitude: number;
-                accuracy: number | undefined;
+                accuracy: any;
                 timestamp: number;
             } | null;
-            helpMessage: string | undefined;
+            helpMessage: any;
         } | null;
         updatedAt: number;
     }>;
     saveTripSafetyState(driverId: string, tripId: string, state: Record<string, unknown>): Promise<{
         tripId: string;
         temporaryStop: {
-            status: "stop_requested" | "temporarily_stopped" | "idle";
-            requestNote: string | undefined;
+            status: any;
+            requestNote: any;
         };
         safetyCheck: {
-            status: string;
-            driverAction: "sos" | "okay" | null;
-            passengerAction: "sos" | "okay" | null;
+            status: any;
+            driverAction: any;
+            passengerAction: any;
         };
         lastEmergencyDispatch: {
             id: string;
             tripId: string;
-            triggeredBy: "driver" | "passenger";
+            triggeredBy: any;
             triggeredAt: number;
-            contactsNotified: string[];
+            contactsNotified: any;
             location: {
                 latitude: number;
                 longitude: number;
-                accuracy: number | undefined;
+                accuracy: any;
                 timestamp: number;
             } | null;
-            helpMessage: string | undefined;
+            helpMessage: any;
         } | null;
         updatedAt: number;
     }>;
-    listEmergencyContacts(driverId: string): Promise<EmergencyContact[]>;
+    listEmergencyContacts(driverId: string): Promise<{
+        phone: string;
+        name: string;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        relationship: string | null;
+    }[]>;
     createEmergencyContact(driverId: string, input: {
         name: string;
         phone: string;
         relationship?: string;
-    }): Promise<EmergencyContact>;
+    }): Promise<{
+        phone: string;
+        name: string;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        relationship: string | null;
+    }>;
     patchEmergencyContact(driverId: string, contactId: string, patch: Partial<{
         name: string;
         phone: string;
         relationship?: string;
-    }>): Promise<EmergencyContact>;
+    }>): Promise<{
+        phone: string;
+        name: string;
+        id: string;
+        driverId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        relationship: string | null;
+    }>;
     deleteEmergencyContact(driverId: string, contactId: string): Promise<{
         deleted: boolean;
     }>;

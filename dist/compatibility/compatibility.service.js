@@ -8,19 +8,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompatibilityContractService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
+const prisma_service_1 = require("../prisma/prisma.service");
 const crypto_1 = require("crypto");
-const feature_flag_entity_1 = require("../entities/feature-flag.entity");
 let CompatibilityContractService = class CompatibilityContractService {
-    constructor(featureFlagRepo) {
-        this.featureFlagRepo = featureFlagRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
         this.contracts = [
             {
                 appId: 'rider',
@@ -328,11 +323,10 @@ let CompatibilityContractService = class CompatibilityContractService {
     }
     async getRuntimeFlags(appId) {
         const flagKey = `${appId}_backend_enabled`;
-        const flags = await this.featureFlagRepo.find({
-            where: [
-                { scope: appId },
-                { scope: 'global' }
-            ]
+        const flags = await this.prisma.featureFlag.findMany({
+            where: {
+                OR: [{ scope: appId }, { scope: 'global' }],
+            },
         });
         const backendFlag = flags.find((item) => item.key === flagKey);
         return {
@@ -404,7 +398,6 @@ let CompatibilityContractService = class CompatibilityContractService {
 exports.CompatibilityContractService = CompatibilityContractService;
 exports.CompatibilityContractService = CompatibilityContractService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(feature_flag_entity_1.FeatureFlag)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], CompatibilityContractService);
 //# sourceMappingURL=compatibility.service.js.map

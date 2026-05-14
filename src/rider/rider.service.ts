@@ -1,19 +1,10 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PrismaService } from '../prisma/prisma.service';
 import { PresenceLocationService } from '../presence-location/presence-location.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import { randomUUID } from 'crypto';
 import type { RequestRiderTripDto, UpdateRiderTripTrackingDto } from './dto/rider.dto';
-import { RiderProfile } from '../entities/rider-profile.entity';
-import { Trip } from '../entities/trip.entity';
-import { JobOffer } from '../entities/job-offer.entity';
-import { Notification } from '../entities/notification.entity';
-import { User } from '../entities/user.entity';
-import { WalletAccount } from '../entities/wallet-account.entity';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { RiderServiceRequest } from '../entities/rider-service-request.entity';
 
 @Injectable()
 export class RiderService {
@@ -21,27 +12,20 @@ export class RiderService {
   private readonly paymentIntentStore = new Map<string, Array<Record<string, unknown>>>();
 
   constructor(
-    @InjectRepository(RiderProfile) private riderProfileRepo: Repository<RiderProfile>,
-    @InjectRepository(Trip) private tripRepo: Repository<Trip>,
-    @InjectRepository(JobOffer) private jobOfferRepo: Repository<JobOffer>,
-    @InjectRepository(Notification) private notificationRepo: Repository<Notification>,
-    @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(WalletAccount) private walletRepo: Repository<WalletAccount>,
-    @InjectRepository(EarningsLedger) private earningsLedgerRepo: Repository<EarningsLedger>,
-    @InjectRepository(RiderServiceRequest) private riderServiceRequestRepo: Repository<RiderServiceRequest>,
+    private readonly prisma: PrismaService,
     @Optional() private readonly presenceLocationService?: PresenceLocationService,
     @Optional() private readonly realtimeGateway?: RealtimeGateway,
     @Optional() private readonly riderRealtimeGateway?: RiderRealtimeGateway,
   ) {}
 
   async getProfile(userId: string) {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    const profile = await this.riderProfileRepo.findOne({ where: { userId } });
+    const profile = await this.prisma.riderProfile.findFirst({ where: { userId } });
     if (!profile) {
       throw new NotFoundException('Rider profile not found');
     }
-    return profile;
+    return { ...profile, preferences: profile.preferences as any };
   }
 
   async updateProfile(
@@ -49,19 +33,18 @@ export class RiderService {
     patch: Partial<{ fullName: string; phone: string; city: string; country: string; preferredCurrency: string }>,
   ) {
     const profile = await this.getProfile(userId);
-    profile.fullName = patch.fullName ?? profile.fullName;
-    profile.phone = patch.phone ?? profile.phone;
+    const data: Record<string, unknown> = {};
     if (patch.fullName) {
       const [first, ...rest] = patch.fullName.split(' ');
-      profile.firstName = first;
-      profile.lastName = rest.join(' ');
+      data.firstName = first;
+      data.lastName = rest.join(' ');
+      data.fullName = patch.fullName;
     }
-    if (patch.city) profile.city = patch.city;
-    if (patch.country) profile.country = patch.country;
-    if (patch.preferredCurrency) profile.preferredCurrency = patch.preferredCurrency;
-    
-    await this.riderProfileRepo.save(profile);
-    return profile;
+    if (patch.phone) data.phone = patch.phone;
+    if (patch.city) data.city = patch.city;
+    if (patch.country) data.country = patch.country;
+    if (patch.preferredCurrency) data.preferredCurrency = patch.preferredCurrency;
+    return this.prisma.riderProfile.update({ where: { id: profile.id }, data });
   }
 
   async getPreferences(userId: string) {
@@ -73,17 +56,16 @@ export class RiderService {
     const profile = await this.getProfile(userId);
     const current = this.normalizeRiderPreferences(profile.preferences);
     const next = this.deepMerge(current, patch);
-    profile.preferences = {
-      ...profile.preferences,
-      ...next,
-    };
-    await this.riderProfileRepo.save(profile);
-    return this.normalizeRiderPreferences(profile.preferences);
+    await this.prisma.riderProfile.update({
+      where: { id: profile.id },
+      data: { preferences: { ...profile.preferences, ...next } },
+    });
+    return next;
   }
 
   async listEmergencyContacts(userId: string) {
     const profile = await this.getProfile(userId);
-    const prefs = this.normalizeRiderPreferences(profile.preferences);
+    const prefs = this.normalizeRiderPreferences(profile.preferences as any);
     return prefs.emergencyContacts;
   }
 
@@ -92,7 +74,7 @@ export class RiderService {
     input: { name: string; phone: string; relationship: string; isPrimary?: boolean },
   ) {
     const profile = await this.getProfile(userId);
-    const prefs = this.normalizeRiderPreferences(profile.preferences);
+    const prefs = this.normalizeRiderPreferences(profile.preferences as any);
     const nextContacts = prefs.emergencyContacts.map((contact) => ({
       ...contact,
       isPrimary: input.isPrimary ? false : contact.isPrimary,
@@ -105,12 +87,10 @@ export class RiderService {
       isPrimary: input.isPrimary ?? nextContacts.length === 0,
     };
     nextContacts.unshift(created);
-    profile.preferences = {
-      ...profile.preferences,
-      ...prefs,
-      emergencyContacts: nextContacts,
-    };
-    await this.riderProfileRepo.save(profile);
+    await this.prisma.riderProfile.update({
+      where: { id: profile.id },
+      data: { preferences: { ...(profile.preferences as any), ...prefs, emergencyContacts: nextContacts } as any },
+    });
     return created;
   }
 
@@ -120,7 +100,7 @@ export class RiderService {
     patch: Partial<{ name: string; phone: string; relationship: string; isPrimary: boolean }>,
   ) {
     const profile = await this.getProfile(userId);
-    const prefs = this.normalizeRiderPreferences(profile.preferences);
+    const prefs = this.normalizeRiderPreferences(profile.preferences as any);
     const target = prefs.emergencyContacts.find((contact) => contact.id === contactId);
     if (!target) {
       throw new NotFoundException('Emergency contact not found');
@@ -139,18 +119,16 @@ export class RiderService {
       };
     });
 
-    profile.preferences = {
-      ...profile.preferences,
-      ...prefs,
-      emergencyContacts: nextContacts,
-    };
-    await this.riderProfileRepo.save(profile);
+    await this.prisma.riderProfile.update({
+      where: { id: profile.id },
+      data: { preferences: { ...profile.preferences, ...prefs, emergencyContacts: nextContacts } },
+    });
     return nextContacts.find((contact) => contact.id === contactId)!;
   }
 
   async deleteEmergencyContact(userId: string, contactId: string) {
     const profile = await this.getProfile(userId);
-    const prefs = this.normalizeRiderPreferences(profile.preferences);
+    const prefs = this.normalizeRiderPreferences(profile.preferences as any);
     const existing = prefs.emergencyContacts.find((contact) => contact.id === contactId);
     if (!existing) {
       throw new NotFoundException('Emergency contact not found');
@@ -161,12 +139,10 @@ export class RiderService {
       remaining[0].isPrimary = true;
     }
 
-    profile.preferences = {
-      ...profile.preferences,
-      ...prefs,
-      emergencyContacts: remaining,
-    };
-    await this.riderProfileRepo.save(profile);
+    await this.prisma.riderProfile.update({
+      where: { id: profile.id },
+      data: { preferences: { ...profile.preferences, ...prefs, emergencyContacts: remaining } },
+    });
     return { deleted: true };
   }
 
@@ -175,7 +151,7 @@ export class RiderService {
     input: { message?: string; location?: { lat?: number; lng?: number }; type?: 'sos' | 'emergency'; tripId?: string },
   ) {
     const profile = await this.getProfile(userId);
-    const prefs = this.normalizeRiderPreferences(profile.preferences);
+    const prefs = this.normalizeRiderPreferences(profile.preferences as any);
     const event = {
       id: randomUUID(),
       tripId: input.tripId,
@@ -190,31 +166,25 @@ export class RiderService {
     };
 
     const sosHistory = [event, ...prefs.sosHistory].slice(0, 100);
-    profile.preferences = {
-      ...profile.preferences,
-      ...prefs,
-      sosHistory,
-    };
-    await this.riderProfileRepo.save(profile);
+    await this.prisma.riderProfile.update({
+      where: { id: profile.id },
+      data: { preferences: { ...profile.preferences, ...prefs, sosHistory } },
+    });
     return event;
   }
 
   async listSosHistory(userId: string) {
     const profile = await this.getProfile(userId);
-    const prefs = this.normalizeRiderPreferences(profile.preferences);
+    const prefs = this.normalizeRiderPreferences(profile.preferences as any);
     return prefs.sosHistory;
   }
 
   async getWallet(userId: string) {
-    let wallet = await this.walletRepo.findOne({ where: { userId } });
+    let wallet = await this.prisma.walletAccount.findFirst({ where: { userId } });
     if (!wallet) {
-      wallet = this.walletRepo.create({
-        userId,
-        balance: 0,
-        currency: 'UGX',
-        settings: {},
+      wallet = await this.prisma.walletAccount.create({
+        data: { userId, balance: 0, currency: 'UGX', settings: {} },
       });
-      await this.walletRepo.save(wallet);
     }
 
     return {
@@ -226,9 +196,9 @@ export class RiderService {
   }
 
   async listWalletTransactions(userId: string, limit = 20, offset = 0) {
-    const events = await this.earningsLedgerRepo.find({
+    const events = await this.prisma.earningsLedger.findMany({
       where: { userId },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
       take: Math.max(1, Math.min(100, limit)),
       skip: Math.max(0, offset),
     });
@@ -239,7 +209,7 @@ export class RiderService {
       amount: Number(event.amount),
       currency: 'UGX',
       status: 'completed' as const,
-      description: event.metadata?.description || event.type,
+      description: (event.metadata as any)?.description || event.type,
       createdAt: new Date(event.createdAt).getTime(),
       relatedTripId: event.tripId || event.deliveryOrderId || undefined,
     }));
@@ -284,7 +254,7 @@ export class RiderService {
       throw new NotFoundException('Payment intent not found');
     }
     target.status = 'verified';
-    target.verifiedAt = Date.now();
+    (target as any).verifiedAt = Date.now();
     return target;
   }
 
@@ -397,15 +367,15 @@ export class RiderService {
   }
 
   async listRentals(userId: string) {
-    const records = await this.riderServiceRequestRepo.find({
+    const records = await this.prisma.riderServiceRequest.findMany({
       where: { riderId: userId, serviceType: 'rental' },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
     return records.map((record) => this.mapRentalRecord(record));
   }
 
   async getRentalById(userId: string, rentalId: string) {
-    const record = await this.riderServiceRequestRepo.findOne({
+    const record = await this.prisma.riderServiceRequest.findFirst({
       where: { id: rentalId, riderId: userId, serviceType: 'rental' },
     });
     if (!record) throw new NotFoundException('Rental booking not found');
@@ -416,35 +386,40 @@ export class RiderService {
     userId: string,
     input: { vehicleId: string; startDate: string; endDate: string; pickupLocation?: { lat: number; lng: number; address: string } },
   ) {
-    const record = this.riderServiceRequestRepo.create({
-      riderId: userId,
-      serviceType: 'rental',
-      status: 'upcoming',
-      payload: {
-        vehicleId: input.vehicleId,
-        vehicleName: `Vehicle ${input.vehicleId}`,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        pickupLocation: input.pickupLocation,
-        totalAmount: 0,
-        currency: 'UGX',
+    const saved = await this.prisma.riderServiceRequest.create({
+      data: {
+        riderId: userId,
+        serviceType: 'rental',
+        status: 'upcoming',
+        payload: {
+          vehicleId: input.vehicleId,
+          vehicleName: `Vehicle ${input.vehicleId}`,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          pickupLocation: input.pickupLocation,
+          totalAmount: 0,
+          currency: 'UGX',
+        },
       },
     });
-    const saved = await this.riderServiceRequestRepo.save(record);
     const mapped = this.mapRentalRecord(saved);
     this.publishRiderServiceEvent(userId, 'rental.updated', mapped);
     return mapped;
   }
 
   async patchRental(userId: string, rentalId: string, patch: Partial<Record<string, unknown>>) {
-    const record = await this.riderServiceRequestRepo.findOne({
+    const record = await this.prisma.riderServiceRequest.findFirst({
       where: { id: rentalId, riderId: userId, serviceType: 'rental' },
     });
     if (!record) throw new NotFoundException('Rental booking not found');
 
-    record.status = typeof patch.status === 'string' ? patch.status : record.status;
-    record.payload = { ...(record.payload || {}), ...patch };
-    const saved = await this.riderServiceRequestRepo.save(record);
+    const saved = await this.prisma.riderServiceRequest.update({
+      where: { id: rentalId },
+      data: {
+        status: typeof patch.status === 'string' ? patch.status : record.status,
+        payload: { ...(record.payload as any || {}), ...patch } as any,
+      },
+    });
     const mapped = this.mapRentalRecord(saved);
     this.publishRiderServiceEvent(userId, 'rental.updated', mapped);
     return mapped;
@@ -455,15 +430,15 @@ export class RiderService {
   }
 
   async listTours(userId: string) {
-    const records = await this.riderServiceRequestRepo.find({
+    const records = await this.prisma.riderServiceRequest.findMany({
       where: { riderId: userId, serviceType: 'tour' },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
     return records.map((record) => this.mapTourRecord(record));
   }
 
   async getTourById(userId: string, tourId: string) {
-    const record = await this.riderServiceRequestRepo.findOne({
+    const record = await this.prisma.riderServiceRequest.findFirst({
       where: { id: tourId, riderId: userId, serviceType: 'tour' },
     });
     if (!record) throw new NotFoundException('Tour booking not found');
@@ -474,49 +449,51 @@ export class RiderService {
     userId: string,
     input: { tourId: string; scheduledDate: string; participantsCount: number; specialRequests?: string },
   ) {
-    const record = this.riderServiceRequestRepo.create({
-      riderId: userId,
-      serviceType: 'tour',
-      status: 'booked',
-      payload: {
-        tourId: input.tourId,
-        tourName: `Tour ${input.tourId}`,
-        scheduledDate: input.scheduledDate,
-        participantsCount: input.participantsCount,
-        specialRequests: input.specialRequests,
-        totalPrice: 0,
-        currency: 'UGX',
+    const saved = await this.prisma.riderServiceRequest.create({
+      data: {
+        riderId: userId,
+        serviceType: 'tour',
+        status: 'booked',
+        payload: {
+          tourId: input.tourId,
+          tourName: `Tour ${input.tourId}`,
+          scheduledDate: input.scheduledDate,
+          participantsCount: input.participantsCount,
+          specialRequests: input.specialRequests,
+          totalPrice: 0,
+          currency: 'UGX',
+        },
       },
     });
-    const saved = await this.riderServiceRequestRepo.save(record);
     const mapped = this.mapTourRecord(saved);
     this.publishRiderServiceEvent(userId, 'tour.updated', mapped);
     return mapped;
   }
 
   async cancelTour(userId: string, tourId: string, reason?: string) {
-    const record = await this.riderServiceRequestRepo.findOne({
+    const record = await this.prisma.riderServiceRequest.findFirst({
       where: { id: tourId, riderId: userId, serviceType: 'tour' },
     });
     if (!record) throw new NotFoundException('Tour booking not found');
-    record.status = 'cancelled';
-    record.payload = { ...(record.payload || {}), cancellationReason: reason };
-    const saved = await this.riderServiceRequestRepo.save(record);
+    const saved = await this.prisma.riderServiceRequest.update({
+      where: { id: tourId },
+      data: { status: 'cancelled', payload: { ...(record.payload as any || {}), cancellationReason: reason } as any },
+    });
     const mapped = this.mapTourRecord(saved);
     this.publishRiderServiceEvent(userId, 'tour.updated', mapped);
     return mapped;
   }
 
   async listAmbulances(userId: string) {
-    const records = await this.riderServiceRequestRepo.find({
+    const records = await this.prisma.riderServiceRequest.findMany({
       where: { riderId: userId, serviceType: 'ambulance' },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
     return records.map((record) => this.mapAmbulanceRecord(record));
   }
 
   async getAmbulanceById(userId: string, ambulanceId: string) {
-    const record = await this.riderServiceRequestRepo.findOne({
+    const record = await this.prisma.riderServiceRequest.findFirst({
       where: { id: ambulanceId, riderId: userId, serviceType: 'ambulance' },
     });
     if (!record) throw new NotFoundException('Ambulance request not found');
@@ -534,33 +511,38 @@ export class RiderService {
       priority?: 'normal' | 'urgent' | 'emergency';
     },
   ) {
-    const record = this.riderServiceRequestRepo.create({
-      riderId: userId,
-      serviceType: 'ambulance',
-      status: 'requested',
-      payload: {
-        pickupAddress: input.pickupAddress,
-        pickupLat: input.pickupLat,
-        pickupLng: input.pickupLng,
-        dropoffAddress: input.dropoffAddress,
-        hospitalName: input.hospitalName,
-        priority: input.priority ?? 'normal',
+    const saved = await this.prisma.riderServiceRequest.create({
+      data: {
+        riderId: userId,
+        serviceType: 'ambulance',
+        status: 'requested',
+        payload: {
+          pickupAddress: input.pickupAddress,
+          pickupLat: input.pickupLat,
+          pickupLng: input.pickupLng,
+          dropoffAddress: input.dropoffAddress,
+          hospitalName: input.hospitalName,
+          priority: input.priority ?? 'normal',
+        },
       },
     });
-    const saved = await this.riderServiceRequestRepo.save(record);
     const mapped = this.mapAmbulanceRecord(saved);
     this.publishRiderServiceEvent(userId, 'ambulance.updated', mapped);
     return mapped;
   }
 
   async patchAmbulance(userId: string, ambulanceId: string, patch: Partial<Record<string, unknown>>) {
-    const record = await this.riderServiceRequestRepo.findOne({
+    const record = await this.prisma.riderServiceRequest.findFirst({
       where: { id: ambulanceId, riderId: userId, serviceType: 'ambulance' },
     });
     if (!record) throw new NotFoundException('Ambulance request not found');
-    record.status = typeof patch.status === 'string' ? patch.status : record.status;
-    record.payload = { ...(record.payload || {}), ...patch };
-    const saved = await this.riderServiceRequestRepo.save(record);
+    const saved = await this.prisma.riderServiceRequest.update({
+      where: { id: ambulanceId },
+      data: {
+        status: typeof patch.status === 'string' ? patch.status : record.status,
+        payload: { ...(record.payload as any || {}), ...patch } as any,
+      },
+    });
     const mapped = this.mapAmbulanceRecord(saved);
     this.publishRiderServiceEvent(userId, 'ambulance.updated', mapped);
     return mapped;
@@ -571,27 +553,24 @@ export class RiderService {
   }
 
   async listTrips(userId: string) {
-    return this.tripRepo.find({
+    return this.prisma.trip.findMany({
       where: { riderId: userId },
-      order: { updatedAt: 'DESC' },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
   async getActiveTrip(userId: string) {
-    const activeTrip = await this.tripRepo.findOne({
-      where: [
-        { riderId: userId, status: 'requested' },
-        { riderId: userId, status: 'driver_assigned' },
-        { riderId: userId, status: 'driver_arriving' },
-        { riderId: userId, status: 'arrived' },
-        { riderId: userId, status: 'in_progress' },
-      ],
+    const activeTrip = await this.prisma.trip.findFirst({
+      where: {
+        riderId: userId,
+        status: { in: ['requested', 'driver_assigned', 'driver_arriving', 'arrived', 'in_progress'] },
+      },
     });
     return activeTrip ?? null;
   }
 
   async getTripById(userId: string, tripId: string) {
-    const trip = await this.tripRepo.findOne({
+    const trip = await this.prisma.trip.findFirst({
       where: { id: tripId, riderId: userId },
     });
     if (!trip) {
@@ -609,45 +588,49 @@ export class RiderService {
         input.radiusMeters ?? 5000,
       )) ?? [];
 
-    const jobs = await Promise.all(nearbyDrivers.map(async (driver) => {
-      const job = this.jobOfferRepo.create({
-        driverId: driver.driverId,
-        tripId: trip.id,
-        status: 'pending',
-        estimatedFare: 0,
-      });
+    const jobs = await Promise.all(
+      nearbyDrivers.map(async (driver) => {
+        const job = await this.prisma.jobOffer.create({
+          data: {
+            driverId: driver.driverId,
+            tripId: trip.id,
+            status: 'pending',
+            estimatedFare: 0,
+          },
+        });
 
-      await this.jobOfferRepo.save(job);
-      
-      const notification = this.notificationRepo.create({
-        userId: driver.driverId,
-        title: 'New trip request',
-        body: `${input.pickupAddress} to ${input.dropoffAddress}`,
-        type: 'info',
-        isRead: false,
-      });
-      await this.notificationRepo.save(notification);
+        await this.prisma.notification.create({
+          data: {
+            userId: driver.driverId,
+            userType: 'driver',
+            title: 'New trip request',
+            body: `${input.pickupAddress} to ${input.dropoffAddress}`,
+            isRead: false,
+            read: false,
+          },
+        });
 
-      this.realtimeGateway?.publishEvent({
-        driverId: driver.driverId,
-        event: 'job.offer.new',
-        payload: {
-          jobId: job.id,
-          tripId: trip.id,
-          riderId: userId,
-          pickup: input.pickupAddress,
-          dropoff: input.dropoffAddress,
-          pickupLocation: { lat: input.pickupLat, lng: input.pickupLng },
-          dropoffLocation: { lat: input.dropoffLat, lng: input.dropoffLng },
+        this.realtimeGateway?.publishEvent({
+          driverId: driver.driverId,
+          event: 'job.offer.new',
+          payload: {
+            jobId: job.id,
+            tripId: trip.id,
+            riderId: userId,
+            pickup: input.pickupAddress,
+            dropoff: input.dropoffAddress,
+            pickupLocation: { lat: input.pickupLat, lng: input.pickupLng },
+            dropoffLocation: { lat: input.dropoffLat, lng: input.dropoffLng },
+            distanceMeters: driver.distanceMeters,
+          },
+        });
+
+        return {
+          ...job,
           distanceMeters: driver.distanceMeters,
-        },
-      });
-
-      return {
-        ...job,
-        distanceMeters: driver.distanceMeters,
-      };
-    }));
+        };
+      }),
+    );
 
     return {
       trip,
@@ -657,47 +640,46 @@ export class RiderService {
   }
 
   async updateTripTracking(userId: string, tripId: string, patch: UpdateRiderTripTrackingDto) {
-    const trip = await this.tripRepo.findOne({ where: { id: tripId, riderId: userId } });
+    const trip = await this.prisma.trip.findFirst({ where: { id: tripId, riderId: userId } });
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
 
     const nextStatus = this.mapTrackingStatus(patch.status);
+    const updateData: Record<string, unknown> = {};
     if (nextStatus) {
-      trip.status = nextStatus as any;
+      updateData.status = nextStatus;
       const now = new Date();
       if (nextStatus === 'arrived') {
-        trip.driverArrivedAt = trip.driverArrivedAt ?? now;
+        updateData.driverArrivedAt = trip.driverArrivedAt ?? now;
       }
       if (nextStatus === 'in_progress') {
-        trip.startedAt = trip.startedAt ?? now;
+        updateData.startedAt = trip.startedAt ?? now;
       }
       if (nextStatus === 'completed') {
-        trip.completedAt = trip.completedAt ?? now;
+        updateData.completedAt = trip.completedAt ?? now;
       }
       if (nextStatus === 'cancelled') {
-        trip.cancelledAt = trip.cancelledAt ?? now;
+        updateData.cancelledAt = trip.cancelledAt ?? now;
       }
     }
 
-    await this.tripRepo.save(trip);
-    return trip;
+    return this.prisma.trip.update({ where: { id: tripId }, data: updateData });
   }
 
-  private async createRequestedTrip(riderId: string, input: RequestRiderTripDto): Promise<Trip> {
-    const trip = this.tripRepo.create({
-      riderId,
-      type: (input.type as any) ?? 'ride',
-      status: 'requested',
-      pickupAddress: input.pickupAddress,
-      dropoffAddress: input.dropoffAddress,
-      pickupLocation: { lat: input.pickupLat, lng: input.pickupLng },
-      dropoffLocation: { lat: input.dropoffLat, lng: input.dropoffLng },
-      otpCode: String(Math.floor(1000 + Math.random() * 9000)),
+  private async createRequestedTrip(riderId: string, input: RequestRiderTripDto) {
+    return this.prisma.trip.create({
+      data: {
+        riderId,
+        type: (input.type as any) ?? 'ride',
+        status: 'requested',
+        pickupAddress: input.pickupAddress,
+        dropoffAddress: input.dropoffAddress,
+        pickupLocation: { lat: input.pickupLat, lng: input.pickupLng } as any,
+        dropoffLocation: { lat: input.dropoffLat, lng: input.dropoffLng } as any,
+        otpCode: String(Math.floor(1000 + Math.random() * 9000)),
+      },
     });
-
-    await this.tripRepo.save(trip);
-    return trip;
   }
 
   private mapTrackingStatus(status: UpdateRiderTripTrackingDto['status']) {
@@ -716,7 +698,7 @@ export class RiderService {
     }
   }
 
-  private mapRentalRecord(record: RiderServiceRequest) {
+  private mapRentalRecord(record: any) {
     const payload = record.payload || {};
     return {
       id: record.id,
@@ -732,7 +714,7 @@ export class RiderService {
     };
   }
 
-  private mapTourRecord(record: RiderServiceRequest) {
+  private mapTourRecord(record: any) {
     const payload = record.payload || {};
     return {
       id: record.id,
@@ -748,7 +730,7 @@ export class RiderService {
     };
   }
 
-  private mapAmbulanceRecord(record: RiderServiceRequest) {
+  private mapAmbulanceRecord(record: any) {
     const payload = record.payload || {};
     return {
       id: record.id,
@@ -777,7 +759,14 @@ export class RiderService {
   private normalizeAmbulanceStatus(
     status: string,
   ): 'requested' | 'dispatched' | 'en_route' | 'arrived' | 'in_progress' | 'completed' | 'cancelled' {
-    if (status === 'dispatched' || status === 'en_route' || status === 'arrived' || status === 'in_progress' || status === 'completed' || status === 'cancelled') {
+    if (
+      status === 'dispatched' ||
+      status === 'en_route' ||
+      status === 'arrived' ||
+      status === 'in_progress' ||
+      status === 'completed' ||
+      status === 'cancelled'
+    ) {
       return status;
     }
     return 'requested';
@@ -820,7 +809,13 @@ export class RiderService {
   private deepMerge<T extends Record<string, any>>(base: T, patch: Record<string, unknown>): T {
     const output: Record<string, any> = { ...base };
     for (const [key, value] of Object.entries(patch)) {
-      if (value && typeof value === 'object' && !Array.isArray(value) && typeof output[key] === 'object' && output[key] !== null) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        typeof output[key] === 'object' &&
+        output[key] !== null
+      ) {
         output[key] = this.deepMerge(output[key], value as Record<string, unknown>);
       } else {
         output[key] = value;

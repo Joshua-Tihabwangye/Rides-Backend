@@ -1,18 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { DriverProfile } from '../entities/driver-profile.entity';
-import { User } from '../entities/user.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class DriverProfileService {
-  constructor(
-    @InjectRepository(DriverProfile) private driverProfileRepo: Repository<DriverProfile>,
-    @InjectRepository(User) private userRepo: Repository<User>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getProfile(driverId: string) {
-    const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
     if (!profile) {
       throw new NotFoundException('Driver profile not found');
     }
@@ -21,29 +15,30 @@ export class DriverProfileService {
 
   async updateProfile(driverId: string, patch: Partial<{ fullName: string; phone: string; city: string; country: string }>) {
     const profile = await this.getProfile(driverId);
+    const data: Record<string, unknown> = {};
     if (patch.fullName) {
       const [first, ...rest] = patch.fullName.split(' ');
-      profile.firstName = first;
-      profile.lastName = rest.join(' ');
+      data.firstName = first;
+      data.lastName = rest.join(' ');
+      data.fullName = patch.fullName;
     }
-    if (patch.city) profile.city = patch.city;
-    if (patch.country) profile.country = patch.country;
+    if (patch.city) data.city = patch.city;
+    if (patch.country) data.country = patch.country;
 
-    await this.driverProfileRepo.save(profile);
-    
+    await this.prisma.driverProfile.update({ where: { id: profile.id }, data });
+
     if (patch.phone) {
-      const user = await this.userRepo.findOne({ where: { id: profile.userId } });
-      if (user) {
-        user.phone = patch.phone;
-        await this.userRepo.save(user);
-      }
+      await this.prisma.user.update({
+        where: { id: profile.userId },
+        data: { phone: patch.phone },
+      });
     }
-    return profile;
+    return this.getProfile(driverId);
   }
 
   async getPreferences(driverId: string) {
     const profile = await this.getProfile(driverId);
-    return profile.preferences || {};
+    return (profile.preferences as Record<string, unknown>) || {};
   }
 
   async updatePreferences(
@@ -51,17 +46,17 @@ export class DriverProfileService {
     patch: Partial<{ areaIds: string[]; serviceIds: string[]; requirementIds: string[] }>,
   ) {
     const profile = await this.getProfile(driverId);
-    profile.preferences = {
-      ...(profile.preferences || {}),
-      ...patch,
-    };
-    await this.driverProfileRepo.save(profile);
-    return profile.preferences;
+    const current = (profile.preferences as Record<string, unknown>) || {};
+    await this.prisma.driverProfile.update({
+      where: { id: profile.id },
+      data: { preferences: { ...current, ...patch } },
+    });
+    return { ...current, ...patch };
   }
 
   async getCheckpoints(driverId: string) {
     const profile = await this.getProfile(driverId);
-    const checkpoints = profile.checkpoints || {};
+    const checkpoints = (profile.checkpoints as Record<string, any>) || {};
     return {
       ...checkpoints,
       onboardingComplete: Object.keys(checkpoints).length > 0 && Object.values(checkpoints).every(Boolean),

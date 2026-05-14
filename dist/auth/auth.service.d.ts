@@ -1,18 +1,13 @@
-import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { Role } from '../entities/role.entity';
-import { UserRole } from '../entities/user-role.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 export declare class AuthService {
-    private userRepo;
-    private roleRepo;
-    private userRoleRepo;
+    private readonly prisma;
     private redis;
     private readonly logger;
     private readonly JWT_SECRET;
     private readonly JWT_EXPIRES_IN;
     private readonly REFRESH_EXPIRES_IN;
-    constructor(userRepo: Repository<User>, roleRepo: Repository<Role>, userRoleRepo: Repository<UserRole>, redis: RedisService);
+    constructor(prisma: PrismaService, redis: RedisService);
     register(data: {
         email: string;
         password: string;

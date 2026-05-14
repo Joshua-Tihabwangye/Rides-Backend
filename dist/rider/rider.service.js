@@ -14,30 +14,14 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RiderService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
+const prisma_service_1 = require("../prisma/prisma.service");
 const presence_location_service_1 = require("../presence-location/presence-location.service");
 const realtime_gateway_1 = require("../realtime/realtime.gateway");
 const scoped_realtime_gateway_1 = require("../realtime/scoped-realtime.gateway");
 const crypto_1 = require("crypto");
-const rider_profile_entity_1 = require("../entities/rider-profile.entity");
-const trip_entity_1 = require("../entities/trip.entity");
-const job_offer_entity_1 = require("../entities/job-offer.entity");
-const notification_entity_1 = require("../entities/notification.entity");
-const user_entity_1 = require("../entities/user.entity");
-const wallet_account_entity_1 = require("../entities/wallet-account.entity");
-const earnings_ledger_entity_1 = require("../entities/earnings-ledger.entity");
-const rider_service_request_entity_1 = require("../entities/rider-service-request.entity");
 let RiderService = class RiderService {
-    constructor(riderProfileRepo, tripRepo, jobOfferRepo, notificationRepo, userRepo, walletRepo, earningsLedgerRepo, riderServiceRequestRepo, presenceLocationService, realtimeGateway, riderRealtimeGateway) {
-        this.riderProfileRepo = riderProfileRepo;
-        this.tripRepo = tripRepo;
-        this.jobOfferRepo = jobOfferRepo;
-        this.notificationRepo = notificationRepo;
-        this.userRepo = userRepo;
-        this.walletRepo = walletRepo;
-        this.earningsLedgerRepo = earningsLedgerRepo;
-        this.riderServiceRequestRepo = riderServiceRequestRepo;
+    constructor(prisma, presenceLocationService, realtimeGateway, riderRealtimeGateway) {
+        this.prisma = prisma;
         this.presenceLocationService = presenceLocationService;
         this.realtimeGateway = realtimeGateway;
         this.riderRealtimeGateway = riderRealtimeGateway;
@@ -45,32 +29,33 @@ let RiderService = class RiderService {
         this.paymentIntentStore = new Map();
     }
     async getProfile(userId) {
-        const user = await this.userRepo.findOne({ where: { id: userId } });
+        const user = await this.prisma.user.findFirst({ where: { id: userId } });
         if (!user)
             throw new common_1.NotFoundException('User not found');
-        const profile = await this.riderProfileRepo.findOne({ where: { userId } });
+        const profile = await this.prisma.riderProfile.findFirst({ where: { userId } });
         if (!profile) {
             throw new common_1.NotFoundException('Rider profile not found');
         }
-        return profile;
+        return { ...profile, preferences: profile.preferences };
     }
     async updateProfile(userId, patch) {
         const profile = await this.getProfile(userId);
-        profile.fullName = patch.fullName ?? profile.fullName;
-        profile.phone = patch.phone ?? profile.phone;
+        const data = {};
         if (patch.fullName) {
             const [first, ...rest] = patch.fullName.split(' ');
-            profile.firstName = first;
-            profile.lastName = rest.join(' ');
+            data.firstName = first;
+            data.lastName = rest.join(' ');
+            data.fullName = patch.fullName;
         }
+        if (patch.phone)
+            data.phone = patch.phone;
         if (patch.city)
-            profile.city = patch.city;
+            data.city = patch.city;
         if (patch.country)
-            profile.country = patch.country;
+            data.country = patch.country;
         if (patch.preferredCurrency)
-            profile.preferredCurrency = patch.preferredCurrency;
-        await this.riderProfileRepo.save(profile);
-        return profile;
+            data.preferredCurrency = patch.preferredCurrency;
+        return this.prisma.riderProfile.update({ where: { id: profile.id }, data });
     }
     async getPreferences(userId) {
         const profile = await this.getProfile(userId);
@@ -80,12 +65,11 @@ let RiderService = class RiderService {
         const profile = await this.getProfile(userId);
         const current = this.normalizeRiderPreferences(profile.preferences);
         const next = this.deepMerge(current, patch);
-        profile.preferences = {
-            ...profile.preferences,
-            ...next,
-        };
-        await this.riderProfileRepo.save(profile);
-        return this.normalizeRiderPreferences(profile.preferences);
+        await this.prisma.riderProfile.update({
+            where: { id: profile.id },
+            data: { preferences: { ...profile.preferences, ...next } },
+        });
+        return next;
     }
     async listEmergencyContacts(userId) {
         const profile = await this.getProfile(userId);
@@ -107,12 +91,10 @@ let RiderService = class RiderService {
             isPrimary: input.isPrimary ?? nextContacts.length === 0,
         };
         nextContacts.unshift(created);
-        profile.preferences = {
-            ...profile.preferences,
-            ...prefs,
-            emergencyContacts: nextContacts,
-        };
-        await this.riderProfileRepo.save(profile);
+        await this.prisma.riderProfile.update({
+            where: { id: profile.id },
+            data: { preferences: { ...profile.preferences, ...prefs, emergencyContacts: nextContacts } },
+        });
         return created;
     }
     async patchEmergencyContact(userId, contactId, patch) {
@@ -134,12 +116,10 @@ let RiderService = class RiderService {
                 ...patch,
             };
         });
-        profile.preferences = {
-            ...profile.preferences,
-            ...prefs,
-            emergencyContacts: nextContacts,
-        };
-        await this.riderProfileRepo.save(profile);
+        await this.prisma.riderProfile.update({
+            where: { id: profile.id },
+            data: { preferences: { ...profile.preferences, ...prefs, emergencyContacts: nextContacts } },
+        });
         return nextContacts.find((contact) => contact.id === contactId);
     }
     async deleteEmergencyContact(userId, contactId) {
@@ -153,12 +133,10 @@ let RiderService = class RiderService {
         if (existing.isPrimary && remaining.length > 0) {
             remaining[0].isPrimary = true;
         }
-        profile.preferences = {
-            ...profile.preferences,
-            ...prefs,
-            emergencyContacts: remaining,
-        };
-        await this.riderProfileRepo.save(profile);
+        await this.prisma.riderProfile.update({
+            where: { id: profile.id },
+            data: { preferences: { ...profile.preferences, ...prefs, emergencyContacts: remaining } },
+        });
         return { deleted: true };
     }
     async triggerSos(userId, input) {
@@ -176,12 +154,10 @@ let RiderService = class RiderService {
             createdAt: Date.now(),
         };
         const sosHistory = [event, ...prefs.sosHistory].slice(0, 100);
-        profile.preferences = {
-            ...profile.preferences,
-            ...prefs,
-            sosHistory,
-        };
-        await this.riderProfileRepo.save(profile);
+        await this.prisma.riderProfile.update({
+            where: { id: profile.id },
+            data: { preferences: { ...profile.preferences, ...prefs, sosHistory } },
+        });
         return event;
     }
     async listSosHistory(userId) {
@@ -190,15 +166,11 @@ let RiderService = class RiderService {
         return prefs.sosHistory;
     }
     async getWallet(userId) {
-        let wallet = await this.walletRepo.findOne({ where: { userId } });
+        let wallet = await this.prisma.walletAccount.findFirst({ where: { userId } });
         if (!wallet) {
-            wallet = this.walletRepo.create({
-                userId,
-                balance: 0,
-                currency: 'UGX',
-                settings: {},
+            wallet = await this.prisma.walletAccount.create({
+                data: { userId, balance: 0, currency: 'UGX', settings: {} },
             });
-            await this.walletRepo.save(wallet);
         }
         return {
             balance: Number(wallet.balance),
@@ -208,9 +180,9 @@ let RiderService = class RiderService {
         };
     }
     async listWalletTransactions(userId, limit = 20, offset = 0) {
-        const events = await this.earningsLedgerRepo.find({
+        const events = await this.prisma.earningsLedger.findMany({
             where: { userId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
             take: Math.max(1, Math.min(100, limit)),
             skip: Math.max(0, offset),
         });
@@ -355,14 +327,14 @@ let RiderService = class RiderService {
         return intents.filter((intent) => intent.serviceType === 'wallet_transfer');
     }
     async listRentals(userId) {
-        const records = await this.riderServiceRequestRepo.find({
+        const records = await this.prisma.riderServiceRequest.findMany({
             where: { riderId: userId, serviceType: 'rental' },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
         return records.map((record) => this.mapRentalRecord(record));
     }
     async getRentalById(userId, rentalId) {
-        const record = await this.riderServiceRequestRepo.findOne({
+        const record = await this.prisma.riderServiceRequest.findFirst({
             where: { id: rentalId, riderId: userId, serviceType: 'rental' },
         });
         if (!record)
@@ -370,34 +342,39 @@ let RiderService = class RiderService {
         return this.mapRentalRecord(record);
     }
     async createRental(userId, input) {
-        const record = this.riderServiceRequestRepo.create({
-            riderId: userId,
-            serviceType: 'rental',
-            status: 'upcoming',
-            payload: {
-                vehicleId: input.vehicleId,
-                vehicleName: `Vehicle ${input.vehicleId}`,
-                startDate: input.startDate,
-                endDate: input.endDate,
-                pickupLocation: input.pickupLocation,
-                totalAmount: 0,
-                currency: 'UGX',
+        const saved = await this.prisma.riderServiceRequest.create({
+            data: {
+                riderId: userId,
+                serviceType: 'rental',
+                status: 'upcoming',
+                payload: {
+                    vehicleId: input.vehicleId,
+                    vehicleName: `Vehicle ${input.vehicleId}`,
+                    startDate: input.startDate,
+                    endDate: input.endDate,
+                    pickupLocation: input.pickupLocation,
+                    totalAmount: 0,
+                    currency: 'UGX',
+                },
             },
         });
-        const saved = await this.riderServiceRequestRepo.save(record);
         const mapped = this.mapRentalRecord(saved);
         this.publishRiderServiceEvent(userId, 'rental.updated', mapped);
         return mapped;
     }
     async patchRental(userId, rentalId, patch) {
-        const record = await this.riderServiceRequestRepo.findOne({
+        const record = await this.prisma.riderServiceRequest.findFirst({
             where: { id: rentalId, riderId: userId, serviceType: 'rental' },
         });
         if (!record)
             throw new common_1.NotFoundException('Rental booking not found');
-        record.status = typeof patch.status === 'string' ? patch.status : record.status;
-        record.payload = { ...(record.payload || {}), ...patch };
-        const saved = await this.riderServiceRequestRepo.save(record);
+        const saved = await this.prisma.riderServiceRequest.update({
+            where: { id: rentalId },
+            data: {
+                status: typeof patch.status === 'string' ? patch.status : record.status,
+                payload: { ...(record.payload || {}), ...patch },
+            },
+        });
         const mapped = this.mapRentalRecord(saved);
         this.publishRiderServiceEvent(userId, 'rental.updated', mapped);
         return mapped;
@@ -406,14 +383,14 @@ let RiderService = class RiderService {
         return this.patchRental(userId, rentalId, { status: 'cancelled', cancellationReason: reason });
     }
     async listTours(userId) {
-        const records = await this.riderServiceRequestRepo.find({
+        const records = await this.prisma.riderServiceRequest.findMany({
             where: { riderId: userId, serviceType: 'tour' },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
         return records.map((record) => this.mapTourRecord(record));
     }
     async getTourById(userId, tourId) {
-        const record = await this.riderServiceRequestRepo.findOne({
+        const record = await this.prisma.riderServiceRequest.findFirst({
             where: { id: tourId, riderId: userId, serviceType: 'tour' },
         });
         if (!record)
@@ -421,47 +398,49 @@ let RiderService = class RiderService {
         return this.mapTourRecord(record);
     }
     async createTour(userId, input) {
-        const record = this.riderServiceRequestRepo.create({
-            riderId: userId,
-            serviceType: 'tour',
-            status: 'booked',
-            payload: {
-                tourId: input.tourId,
-                tourName: `Tour ${input.tourId}`,
-                scheduledDate: input.scheduledDate,
-                participantsCount: input.participantsCount,
-                specialRequests: input.specialRequests,
-                totalPrice: 0,
-                currency: 'UGX',
+        const saved = await this.prisma.riderServiceRequest.create({
+            data: {
+                riderId: userId,
+                serviceType: 'tour',
+                status: 'booked',
+                payload: {
+                    tourId: input.tourId,
+                    tourName: `Tour ${input.tourId}`,
+                    scheduledDate: input.scheduledDate,
+                    participantsCount: input.participantsCount,
+                    specialRequests: input.specialRequests,
+                    totalPrice: 0,
+                    currency: 'UGX',
+                },
             },
         });
-        const saved = await this.riderServiceRequestRepo.save(record);
         const mapped = this.mapTourRecord(saved);
         this.publishRiderServiceEvent(userId, 'tour.updated', mapped);
         return mapped;
     }
     async cancelTour(userId, tourId, reason) {
-        const record = await this.riderServiceRequestRepo.findOne({
+        const record = await this.prisma.riderServiceRequest.findFirst({
             where: { id: tourId, riderId: userId, serviceType: 'tour' },
         });
         if (!record)
             throw new common_1.NotFoundException('Tour booking not found');
-        record.status = 'cancelled';
-        record.payload = { ...(record.payload || {}), cancellationReason: reason };
-        const saved = await this.riderServiceRequestRepo.save(record);
+        const saved = await this.prisma.riderServiceRequest.update({
+            where: { id: tourId },
+            data: { status: 'cancelled', payload: { ...(record.payload || {}), cancellationReason: reason } },
+        });
         const mapped = this.mapTourRecord(saved);
         this.publishRiderServiceEvent(userId, 'tour.updated', mapped);
         return mapped;
     }
     async listAmbulances(userId) {
-        const records = await this.riderServiceRequestRepo.find({
+        const records = await this.prisma.riderServiceRequest.findMany({
             where: { riderId: userId, serviceType: 'ambulance' },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
         return records.map((record) => this.mapAmbulanceRecord(record));
     }
     async getAmbulanceById(userId, ambulanceId) {
-        const record = await this.riderServiceRequestRepo.findOne({
+        const record = await this.prisma.riderServiceRequest.findFirst({
             where: { id: ambulanceId, riderId: userId, serviceType: 'ambulance' },
         });
         if (!record)
@@ -469,33 +448,38 @@ let RiderService = class RiderService {
         return this.mapAmbulanceRecord(record);
     }
     async createAmbulance(userId, input) {
-        const record = this.riderServiceRequestRepo.create({
-            riderId: userId,
-            serviceType: 'ambulance',
-            status: 'requested',
-            payload: {
-                pickupAddress: input.pickupAddress,
-                pickupLat: input.pickupLat,
-                pickupLng: input.pickupLng,
-                dropoffAddress: input.dropoffAddress,
-                hospitalName: input.hospitalName,
-                priority: input.priority ?? 'normal',
+        const saved = await this.prisma.riderServiceRequest.create({
+            data: {
+                riderId: userId,
+                serviceType: 'ambulance',
+                status: 'requested',
+                payload: {
+                    pickupAddress: input.pickupAddress,
+                    pickupLat: input.pickupLat,
+                    pickupLng: input.pickupLng,
+                    dropoffAddress: input.dropoffAddress,
+                    hospitalName: input.hospitalName,
+                    priority: input.priority ?? 'normal',
+                },
             },
         });
-        const saved = await this.riderServiceRequestRepo.save(record);
         const mapped = this.mapAmbulanceRecord(saved);
         this.publishRiderServiceEvent(userId, 'ambulance.updated', mapped);
         return mapped;
     }
     async patchAmbulance(userId, ambulanceId, patch) {
-        const record = await this.riderServiceRequestRepo.findOne({
+        const record = await this.prisma.riderServiceRequest.findFirst({
             where: { id: ambulanceId, riderId: userId, serviceType: 'ambulance' },
         });
         if (!record)
             throw new common_1.NotFoundException('Ambulance request not found');
-        record.status = typeof patch.status === 'string' ? patch.status : record.status;
-        record.payload = { ...(record.payload || {}), ...patch };
-        const saved = await this.riderServiceRequestRepo.save(record);
+        const saved = await this.prisma.riderServiceRequest.update({
+            where: { id: ambulanceId },
+            data: {
+                status: typeof patch.status === 'string' ? patch.status : record.status,
+                payload: { ...(record.payload || {}), ...patch },
+            },
+        });
         const mapped = this.mapAmbulanceRecord(saved);
         this.publishRiderServiceEvent(userId, 'ambulance.updated', mapped);
         return mapped;
@@ -504,25 +488,22 @@ let RiderService = class RiderService {
         return this.patchAmbulance(userId, ambulanceId, { status: 'cancelled', cancellationReason: reason });
     }
     async listTrips(userId) {
-        return this.tripRepo.find({
+        return this.prisma.trip.findMany({
             where: { riderId: userId },
-            order: { updatedAt: 'DESC' },
+            orderBy: { updatedAt: 'desc' },
         });
     }
     async getActiveTrip(userId) {
-        const activeTrip = await this.tripRepo.findOne({
-            where: [
-                { riderId: userId, status: 'requested' },
-                { riderId: userId, status: 'driver_assigned' },
-                { riderId: userId, status: 'driver_arriving' },
-                { riderId: userId, status: 'arrived' },
-                { riderId: userId, status: 'in_progress' },
-            ],
+        const activeTrip = await this.prisma.trip.findFirst({
+            where: {
+                riderId: userId,
+                status: { in: ['requested', 'driver_assigned', 'driver_arriving', 'arrived', 'in_progress'] },
+            },
         });
         return activeTrip ?? null;
     }
     async getTripById(userId, tripId) {
-        const trip = await this.tripRepo.findOne({
+        const trip = await this.prisma.trip.findFirst({
             where: { id: tripId, riderId: userId },
         });
         if (!trip) {
@@ -534,21 +515,24 @@ let RiderService = class RiderService {
         const trip = await this.createRequestedTrip(userId, input);
         const nearbyDrivers = (await this.presenceLocationService?.findNearbyDrivers(input.pickupLat, input.pickupLng, input.radiusMeters ?? 5000)) ?? [];
         const jobs = await Promise.all(nearbyDrivers.map(async (driver) => {
-            const job = this.jobOfferRepo.create({
-                driverId: driver.driverId,
-                tripId: trip.id,
-                status: 'pending',
-                estimatedFare: 0,
+            const job = await this.prisma.jobOffer.create({
+                data: {
+                    driverId: driver.driverId,
+                    tripId: trip.id,
+                    status: 'pending',
+                    estimatedFare: 0,
+                },
             });
-            await this.jobOfferRepo.save(job);
-            const notification = this.notificationRepo.create({
-                userId: driver.driverId,
-                title: 'New trip request',
-                body: `${input.pickupAddress} to ${input.dropoffAddress}`,
-                type: 'info',
-                isRead: false,
+            await this.prisma.notification.create({
+                data: {
+                    userId: driver.driverId,
+                    userType: 'driver',
+                    title: 'New trip request',
+                    body: `${input.pickupAddress} to ${input.dropoffAddress}`,
+                    isRead: false,
+                    read: false,
+                },
             });
-            await this.notificationRepo.save(notification);
             this.realtimeGateway?.publishEvent({
                 driverId: driver.driverId,
                 event: 'job.offer.new',
@@ -575,43 +559,43 @@ let RiderService = class RiderService {
         };
     }
     async updateTripTracking(userId, tripId, patch) {
-        const trip = await this.tripRepo.findOne({ where: { id: tripId, riderId: userId } });
+        const trip = await this.prisma.trip.findFirst({ where: { id: tripId, riderId: userId } });
         if (!trip) {
             throw new common_1.NotFoundException('Trip not found');
         }
         const nextStatus = this.mapTrackingStatus(patch.status);
+        const updateData = {};
         if (nextStatus) {
-            trip.status = nextStatus;
+            updateData.status = nextStatus;
             const now = new Date();
             if (nextStatus === 'arrived') {
-                trip.driverArrivedAt = trip.driverArrivedAt ?? now;
+                updateData.driverArrivedAt = trip.driverArrivedAt ?? now;
             }
             if (nextStatus === 'in_progress') {
-                trip.startedAt = trip.startedAt ?? now;
+                updateData.startedAt = trip.startedAt ?? now;
             }
             if (nextStatus === 'completed') {
-                trip.completedAt = trip.completedAt ?? now;
+                updateData.completedAt = trip.completedAt ?? now;
             }
             if (nextStatus === 'cancelled') {
-                trip.cancelledAt = trip.cancelledAt ?? now;
+                updateData.cancelledAt = trip.cancelledAt ?? now;
             }
         }
-        await this.tripRepo.save(trip);
-        return trip;
+        return this.prisma.trip.update({ where: { id: tripId }, data: updateData });
     }
     async createRequestedTrip(riderId, input) {
-        const trip = this.tripRepo.create({
-            riderId,
-            type: input.type ?? 'ride',
-            status: 'requested',
-            pickupAddress: input.pickupAddress,
-            dropoffAddress: input.dropoffAddress,
-            pickupLocation: { lat: input.pickupLat, lng: input.pickupLng },
-            dropoffLocation: { lat: input.dropoffLat, lng: input.dropoffLng },
-            otpCode: String(Math.floor(1000 + Math.random() * 9000)),
+        return this.prisma.trip.create({
+            data: {
+                riderId,
+                type: input.type ?? 'ride',
+                status: 'requested',
+                pickupAddress: input.pickupAddress,
+                dropoffAddress: input.dropoffAddress,
+                pickupLocation: { lat: input.pickupLat, lng: input.pickupLng },
+                dropoffLocation: { lat: input.dropoffLat, lng: input.dropoffLng },
+                otpCode: String(Math.floor(1000 + Math.random() * 9000)),
+            },
         });
-        await this.tripRepo.save(trip);
-        return trip;
     }
     mapTrackingStatus(status) {
         switch (status) {
@@ -684,7 +668,12 @@ let RiderService = class RiderService {
         return 'booked';
     }
     normalizeAmbulanceStatus(status) {
-        if (status === 'dispatched' || status === 'en_route' || status === 'arrived' || status === 'in_progress' || status === 'completed' || status === 'cancelled') {
+        if (status === 'dispatched' ||
+            status === 'en_route' ||
+            status === 'arrived' ||
+            status === 'in_progress' ||
+            status === 'completed' ||
+            status === 'cancelled') {
             return status;
         }
         return 'requested';
@@ -724,7 +713,11 @@ let RiderService = class RiderService {
     deepMerge(base, patch) {
         const output = { ...base };
         for (const [key, value] of Object.entries(patch)) {
-            if (value && typeof value === 'object' && !Array.isArray(value) && typeof output[key] === 'object' && output[key] !== null) {
+            if (value &&
+                typeof value === 'object' &&
+                !Array.isArray(value) &&
+                typeof output[key] === 'object' &&
+                output[key] !== null) {
                 output[key] = this.deepMerge(output[key], value);
             }
             else {
@@ -748,25 +741,10 @@ let RiderService = class RiderService {
 exports.RiderService = RiderService;
 exports.RiderService = RiderService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(rider_profile_entity_1.RiderProfile)),
-    __param(1, (0, typeorm_1.InjectRepository)(trip_entity_1.Trip)),
-    __param(2, (0, typeorm_1.InjectRepository)(job_offer_entity_1.JobOffer)),
-    __param(3, (0, typeorm_1.InjectRepository)(notification_entity_1.Notification)),
-    __param(4, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __param(5, (0, typeorm_1.InjectRepository)(wallet_account_entity_1.WalletAccount)),
-    __param(6, (0, typeorm_1.InjectRepository)(earnings_ledger_entity_1.EarningsLedger)),
-    __param(7, (0, typeorm_1.InjectRepository)(rider_service_request_entity_1.RiderServiceRequest)),
-    __param(8, (0, common_1.Optional)()),
-    __param(9, (0, common_1.Optional)()),
-    __param(10, (0, common_1.Optional)()),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
+    __param(1, (0, common_1.Optional)()),
+    __param(2, (0, common_1.Optional)()),
+    __param(3, (0, common_1.Optional)()),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         presence_location_service_1.PresenceLocationService,
         realtime_gateway_1.RealtimeGateway,
         scoped_realtime_gateway_1.RiderRealtimeGateway])

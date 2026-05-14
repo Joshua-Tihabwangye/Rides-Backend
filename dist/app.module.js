@@ -14,6 +14,7 @@ const passport_1 = require("@nestjs/passport");
 const throttler_1 = require("@nestjs/throttler");
 const admin_module_1 = require("./admin/admin.module");
 const database_module_1 = require("./database/database.module");
+const prisma_module_1 = require("./prisma/prisma.module");
 const redis_module_1 = require("./redis/redis.module");
 const common_module_1 = require("./common/common.module");
 const auth_module_1 = require("./auth/auth.module");
@@ -50,6 +51,7 @@ exports.AppModule = AppModule = __decorate([
                     limit: 100,
                 }]),
             passport_1.PassportModule.register({ defaultStrategy: 'jwt' }),
+            prisma_module_1.PrismaModule,
             database_module_1.DatabaseModule,
             redis_module_1.RedisModule,
             common_module_1.CommonModule,

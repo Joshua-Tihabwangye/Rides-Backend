@@ -15,7 +15,15 @@ export declare class CompatibilityContractController {
     getRuntimeFlags(appId: AppId, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         appId: AppId;
         backendEnabled: boolean;
-        flags: import("../entities/feature-flag.entity").FeatureFlag[];
+        flags: {
+            description: string | null;
+            key: string;
+            enabled: boolean;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            scope: import(".prisma/client").$Enums.FeatureFlagScope;
+        }[];
     }>>;
     compatSignIn(appId: AppId, body: CompatSignInDto, req: Request): import("../common/api/api.types").ApiSuccessResponse<{
         user: {

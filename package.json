@@ -10,10 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest",
     "smoke:integration": "node scripts/integration-smoke.mjs",
-    "typeorm": "typeorm-ts-node-commonjs",
-    "migration:generate": "npm run typeorm migration:generate -- -d data-source.ts",
-    "migration:run": "npm run typeorm migration:run -- -d data-source.ts",
-    "migration:revert": "npm run typeorm migration:revert -- -d data-source.ts"
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "ts-node src/database/seed.ts",
+    "db:setup": "npm run prisma:generate && npm run prisma:migrate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
@@ -24,8 +26,9 @@
     "@nestjs/platform-express": "^10.4.8",
     "@nestjs/platform-socket.io": "^10.4.22",
     "@nestjs/throttler": "^6.5.0",
-    "@nestjs/typeorm": "^11.0.1",
     "@nestjs/websockets": "^10.4.8",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@types/bcrypt": "^6.0.0",
     "@types/geojson": "^7946.0.16",
     "@types/jsonwebtoken": "^9.0.10",
@@ -40,11 +43,11 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
+    "prisma": "^7.8.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
     "sqlite3": "^5.1.7",
-    "typeorm": "^0.3.29",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

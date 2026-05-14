@@ -7,6 +7,20 @@ export declare class AdminController {
     private readonly adminService;
     private readonly apiResponse;
     constructor(adminService: AdminService, apiResponse: ApiResponseService);
-    getProfile(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/admin-profile.entity").AdminProfile>>;
-    patchProfile(user: AuthenticatedUser, body: UpdateAdminProfileDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/admin-profile.entity").AdminProfile>>;
+    getProfile(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        firstName: string | null;
+        lastName: string | null;
+        department: string | null;
+        permissions: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        userId: string;
+    }>>;
+    patchProfile(user: AuthenticatedUser, body: UpdateAdminProfileDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        firstName: string | null;
+        lastName: string | null;
+        department: string | null;
+        permissions: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        userId: string;
+    }>>;
 }

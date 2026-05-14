@@ -8,44 +8,43 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const notification_entity_1 = require("../entities/notification.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 let NotificationsService = class NotificationsService {
-    constructor(notificationRepo) {
-        this.notificationRepo = notificationRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
     }
     async list(userType, userId) {
-        return this.notificationRepo.find({
+        return this.prisma.notification.findMany({
             where: { userType, userId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
         });
     }
     async markRead(userType, userId, notificationId) {
-        const notification = await this.notificationRepo.findOne({
+        const notification = await this.prisma.notification.findFirst({
             where: { id: notificationId, userType, userId },
         });
         if (!notification) {
             throw new common_1.NotFoundException('Notification not found');
         }
-        notification.read = true;
-        return this.notificationRepo.save(notification);
+        return this.prisma.notification.update({
+            where: { id: notificationId },
+            data: { read: true, isRead: true },
+        });
     }
     async markAllRead(userType, userId) {
-        const result = await this.notificationRepo.update({ userType, userId, read: false }, { read: true });
-        return { updated: result.affected ?? 0 };
+        const result = await this.prisma.notification.updateMany({
+            where: { userType, userId, read: false },
+            data: { read: true, isRead: true },
+        });
+        return { updated: result.count };
     }
 };
 exports.NotificationsService = NotificationsService;
 exports.NotificationsService = NotificationsService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(notification_entity_1.Notification)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], NotificationsService);
 //# sourceMappingURL=notifications.service.js.map

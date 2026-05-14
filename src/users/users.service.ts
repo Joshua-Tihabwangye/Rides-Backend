@@ -1,19 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getMe(userId: string) {
-    const user = await this.userRepository.findOne({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId, isActive: true },
-      relations: ['userRoles', 'userRoles.role'],
+      include: { userRoles: { include: { role: true } } },
     });
 
     if (!user) {
@@ -30,31 +25,31 @@ export class UsersService {
   }
 
   async patchMe(userId: string, patch: { email?: string; phone?: string }) {
-    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, isActive: true },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    if (patch.email !== undefined) {
-      user.email = patch.email;
-    }
-    if (patch.phone !== undefined) {
-      user.phone = patch.phone;
-    }
+    const data: Record<string, unknown> = {};
+    if (patch.email !== undefined) data.email = patch.email;
+    if (patch.phone !== undefined) data.phone = patch.phone;
 
-    await this.userRepository.save(user);
+    await this.prisma.user.update({ where: { id: userId }, data });
 
     return this.getMe(userId);
   }
 
   async deleteMe(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId, isActive: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, isActive: true },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    user.isActive = false;
-    await this.userRepository.save(user);
+    await this.prisma.user.update({ where: { id: userId }, data: { isActive: false } });
 
     return { deleted: true };
   }

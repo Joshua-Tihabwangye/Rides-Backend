@@ -1,0 +1,1012 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───
+
+enum UserStatus {
+  active
+  deleted
+  suspended
+}
+
+enum DriverServiceMode {
+  ride_only
+  delivery_only
+  dual_mode
+  rental
+  tour
+  ambulance
+  school
+}
+
+enum DriverStatus {
+  online
+  offline
+  busy
+}
+
+enum OnboardingStatus {
+  incomplete
+  complete
+}
+
+enum TripType {
+  ride
+  delivery
+  rental
+  tour
+  ambulance
+  school
+}
+
+enum TripStatus {
+  requested
+  driver_assigned
+  driver_arriving
+  arrived
+  in_progress
+  completed
+  cancelled
+}
+
+enum JobOfferStatus {
+  pending
+  offered
+  accepted
+  rejected
+  cancelled
+  expired
+}
+
+enum DeliveryOrderStatus {
+  draft
+  requested
+  accepted
+  picked_up
+  in_transit
+  out_for_delivery
+  delivered
+  cancelled
+  failed
+}
+
+enum DeliveryRouteStatus {
+  pending
+  pickup_confirmed
+  qr_verified
+  in_progress
+  completed
+  cancelled
+}
+
+enum VehicleType {
+  sedan
+  suv
+  hatchback
+  van
+  motorcycle
+  bus
+  ambulance
+}
+
+enum VehicleStatus {
+  active
+  inactive
+  maintenance
+  retired
+}
+
+enum EarningsType {
+  trip_fare
+  bonus
+  tip
+  penalty
+  adjustment
+  delivery_fare
+}
+
+enum CashoutStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum NotificationType {
+  info
+  warning
+  success
+  error
+}
+
+enum SafetyEventType {
+  temporary_stop
+  safety_check
+  sos
+}
+
+enum PricingConfigStatus {
+  active
+  inactive
+}
+
+enum PromoDiscountType {
+  percent
+  flat
+}
+
+enum PromoStatus {
+  draft
+  active
+  expired
+}
+
+enum FeatureFlagScope {
+  global
+  rider
+  driver
+  fleet
+  admin
+}
+
+enum ApprovalEntityType {
+  company
+  driver
+  vehicle
+  document
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum RiskSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum RiskStatus {
+  open
+  monitoring
+  resolved
+}
+
+enum DocumentStatus {
+  under_review
+  verified
+  rejected
+}
+
+enum FleetDriverStatus {
+  invited
+  active
+  suspended
+}
+
+enum FleetDispatchStatus {
+  pending
+  assigned
+  completed
+  cancelled
+}
+
+enum FleetService {
+  rental
+  tour
+  school_shuttle
+}
+
+enum FleetServiceStatus {
+  pending
+  active
+  completed
+  cancelled
+}
+
+enum FleetPayoutStatus {
+  pending
+  processing
+  paid
+}
+
+enum FleetComplianceSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum FleetComplianceStatus {
+  open
+  investigating
+  resolved
+}
+
+enum FleetTrainingStatus {
+  draft
+  published
+  archived
+}
+
+enum FleetPartnerStatus {
+  pending
+  approved
+  suspended
+}
+
+enum ServiceRequestType {
+  rental
+  tour
+  ambulance
+}
+
+enum AdminAgentStatus {
+  active
+  inactive
+}
+
+enum TrainingModuleStatus {
+  draft
+  published
+  archived
+}
+
+enum PolicyStatus {
+  draft
+  active
+  archived
+}
+
+enum PolicyScope {
+  global
+  rider
+  driver
+  fleet
+  admin
+}
+
+enum VerticalPolicyStatus {
+  active
+  inactive
+}
+
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum MaintenanceType {
+  routine
+  repair
+  inspection
+  tire_change
+  battery_check
+}
+
+enum MaintenanceStatus {
+  scheduled
+  in_progress
+  completed
+  cancelled
+}
+
+// ─── Core Auth / Users ───
+
+model User {
+  id              String      @id @default(uuid()) @db.Uuid
+  email           String      @unique
+  password        String
+  phone           String?
+  status          UserStatus  @default(active)
+  roles           String[]
+  isActive        Boolean     @default(true)
+  isEmailVerified Boolean     @default(false)
+  isPhoneVerified Boolean     @default(false)
+  driverId        String?     @db.Uuid
+  riderId         String?     @db.Uuid
+  fleetId         String?     @db.Uuid
+  adminId         String?     @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  userRoles       UserRole[]
+  driverProfile   DriverProfile?
+  riderProfile    RiderProfile?
+  adminProfile    AdminProfile?
+  fleetProfile    FleetPartnerProfile?
+}
+
+model Role {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @unique
+  description String?
+  permissions String[]
+  userRoles   UserRole[]
+}
+
+model UserRole {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  roleId String @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+}
+
+// ─── Profiles ───
+
+model DriverProfile {
+  id                 String            @id @default(uuid()) @db.Uuid
+  userId             String            @unique @db.Uuid
+  driverId           String?           @unique @db.Uuid
+  fleetId            String?           @db.Uuid
+  branchId           String?           @db.Uuid
+  firstName          String?
+  lastName           String?
+  fullName           String?
+  email              String?
+  phone              String?
+  city               String?
+  country            String?
+  driverLicenseNumber String?
+  serviceMode        DriverServiceMode @default(dual_mode)
+  preferences        Json              @default("{}")
+  checkpoints        Json              @default("{}")
+  status             DriverStatus      @default(offline)
+  onboardingStatus   OnboardingStatus  @default(incomplete)
+  currentLocation    Unsupported("geography(Point, 4326)")?
+  lastLocationAt     DateTime?
+  rating             Decimal           @default(0) @db.Decimal(2, 1)
+  totalTrips         Int               @default(0)
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RiderProfile {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @db.Uuid
+  riderId          String?  @unique @db.Uuid
+  firstName        String?
+  lastName         String?
+  fullName         String?
+  email            String?
+  phone            String?
+  city             String?
+  country          String?
+  preferredCurrency String  @default("UGX")
+  preferences      Json     @default("{}")
+  rating           Decimal  @default(0) @db.Decimal(2, 1)
+  totalTrips       Int      @default(0)
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminProfile {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String  @unique @db.Uuid
+  firstName  String?
+  lastName   String?
+  department String?
+  permissions Json   @default("{}")
+
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Fleet ───
+
+model FleetPartnerProfile {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @unique @db.Uuid
+  fleetId            String?         @unique @db.Uuid
+  companyName        String
+  contactEmail       String?
+  contactPhone       String?
+  registrationNumber String?
+  taxId              String?
+  status             FleetPartnerStatus @default(pending)
+  verticals          Json            @default("{}")
+
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branches           FleetBranch[]
+}
+
+model FleetBranch {
+  id              String                @id @default(uuid()) @db.Uuid
+  fleetPartnerId  String                @db.Uuid
+  fleetId         String?               @db.Uuid
+  name            String
+  address         String?
+  city            String?
+  country         String?
+  phone           String?
+  managerName     String?
+  operatingHours  Json                  @default("{}")
+
+  fleetPartner    FleetPartnerProfile   @relation(fields: [fleetPartnerId], references: [id], onDelete: Cascade)
+}
+
+model FleetDriver {
+  id           String            @id @default(uuid()) @db.Uuid
+  fleetId      String            @db.Uuid
+  userId       String            @db.Uuid
+  driverId     String            @db.Uuid
+  branchId     String?           @db.Uuid
+  fullName     String
+  email        String
+  phone        String
+  city         String?
+  country      String?
+  status       FleetDriverStatus @default(invited)
+  serviceModes String[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model FleetDispatch {
+  id        String                @id @default(uuid()) @db.Uuid
+  fleetId   String                @db.Uuid
+  type      String
+  status    FleetDispatchStatus   @default(pending)
+  driverId  String?               @db.Uuid
+  vehicleId String?               @db.Uuid
+  tripId    String?               @db.Uuid
+  pickup    String
+  dropoff   String
+  notes     String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+}
+
+model FleetServiceRecord {
+  id           String             @id @default(uuid()) @db.Uuid
+  fleetId      String             @db.Uuid
+  service      FleetService
+  status       FleetServiceStatus @default(pending)
+  customerName String
+  assetId      String?            @db.Uuid
+  scheduledAt  BigInt
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model FleetPayout {
+  id        String            @id @default(uuid()) @db.Uuid
+  fleetId   String            @db.Uuid
+  amount    Decimal           @db.Decimal(12, 2)
+  currency  String            @default("UGX")
+  status    FleetPayoutStatus @default(pending)
+  createdAt DateTime          @default(now())
+}
+
+model FleetComplianceIncident {
+  id          String                 @id @default(uuid()) @db.Uuid
+  fleetId     String                 @db.Uuid
+  category    String
+  severity    FleetComplianceSeverity @default(medium)
+  status      FleetComplianceStatus   @default(open)
+  description String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model FleetTrainingCourse {
+  id         String               @id @default(uuid()) @db.Uuid
+  fleetId    String               @db.Uuid
+  title      String
+  status     FleetTrainingStatus  @default(draft)
+  assignedTo String?              @db.Uuid
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+}
+
+// ─── Vehicles ───
+
+model Vehicle {
+  id               String         @id @default(uuid()) @db.Uuid
+  driverId         String         @db.Uuid
+  fleetPartnerId   String?        @db.Uuid
+  fleetId          String?        @db.Uuid
+  make             String
+  model            String
+  year             Int
+  licensePlate     String?
+  type             VehicleType    @default(sedan)
+  status           VehicleStatus  @default(active)
+  accessories      Json           @default("{}")
+  documents        Json           @default("{}")
+  socPercent       Decimal?       @db.Decimal(5, 2)
+  estimatedRangeKm Decimal?       @db.Decimal(10, 2)
+  currentLocation  Unsupported("geography(Point, 4326)")?
+  isEv             Boolean        @default(false)
+}
+
+// ─── Trips ───
+
+model Trip {
+  id                 String     @id @default(uuid()) @db.Uuid
+  riderId            String     @db.Uuid
+  driverId           String?    @db.Uuid
+  fleetPartnerId     String?    @db.Uuid
+  fleetId            String?    @db.Uuid
+  type               TripType   @default(ride)
+  status             TripStatus @default(requested)
+  pickupLocation     Json
+  dropoffLocation    Json
+  pickup             String?
+  dropoff            String?
+  pickupAddress      String
+  dropoffAddress     String
+  route              Json?
+  fare               Decimal    @default(0) @db.Decimal(10, 2)
+  driverEarnings     Decimal    @default(0) @db.Decimal(10, 2)
+  platformFee        Decimal    @default(0) @db.Decimal(10, 2)
+  payment            Json?
+  otpCode            String?
+  scheduledAt        DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason Json?
+  rating             Json?
+  driverArrivedAt    DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model TripStatusHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  tripId    String   @db.Uuid
+  status    String
+  changedBy String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+// ─── Jobs ───
+
+model JobOffer {
+  id            String           @id @default(uuid()) @db.Uuid
+  tripId        String           @db.Uuid
+  driverId      String           @db.Uuid
+  riderId       String?          @db.Uuid
+  status        JobOfferStatus   @default(pending)
+  type          String?
+  pickup        String?
+  dropoff       String?
+  pickupLocation Json?
+  dropoffLocation Json?
+  estimatedFare Decimal          @default(0) @db.Decimal(10, 2)
+  route         Json?
+  expiresAt     DateTime?
+  respondedAt   DateTime?
+  createdAt     DateTime         @default(now())
+}
+
+// ─── Delivery ───
+
+model DeliveryOrder {
+  id        String                @id @default(uuid()) @db.Uuid
+  riderId   String                @db.Uuid
+  driverId  String?               @db.Uuid
+  routeId   String?               @db.Uuid
+  status    DeliveryOrderStatus   @default(draft)
+  pickup    Json
+  dropoff   Json
+  items     Json?
+  fare      Decimal               @default(0) @db.Decimal(10, 2)
+  qrCode    String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+}
+
+model DeliveryRoute {
+  id        String                @id @default(uuid()) @db.Uuid
+  driverId  String                @db.Uuid
+  orderId   String                @db.Uuid
+  status    DeliveryRouteStatus   @default(pending)
+  stops     Json                  @default("[]")
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+}
+
+// ─── Earnings ───
+
+model EarningsLedger {
+  id               String       @id @default(uuid()) @db.Uuid
+  userId           String       @db.Uuid
+  driverId         String?      @db.Uuid
+  type             EarningsType @default(trip_fare)
+  amount           Decimal      @db.Decimal(10, 2)
+  tripId           String?      @db.Uuid
+  deliveryOrderId  String?      @db.Uuid
+  metadata         Json?
+  createdAt        DateTime     @default(now())
+}
+
+model WalletAccount {
+  id       String  @id @default(uuid()) @db.Uuid
+  userId   String  @unique @db.Uuid
+  driverId String? @db.Uuid
+  balance  Decimal @default(0) @db.Decimal(10, 2)
+  currency String  @default("UGX")
+  settings Json    @default("{}")
+  updatedAt DateTime @updatedAt
+}
+
+model CashoutRequest {
+  id       String        @id @default(uuid()) @db.Uuid
+  userId   String        @db.Uuid
+  driverId String?       @db.Uuid
+  amount   Decimal       @db.Decimal(10, 2)
+  status   CashoutStatus @default(pending)
+  method   Json
+  metadata Json?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+// ─── Notifications ───
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  userType  String           @default("rider")
+  title     String
+  body      String
+  type      NotificationType @default(info)
+  data      Json?
+  read      Boolean          @default(false)
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+}
+
+// ─── Safety ───
+
+model SafetyEvent {
+  id        String            @id @default(uuid()) @db.Uuid
+  driverId  String            @db.Uuid
+  tripId    String            @db.Uuid
+  type      SafetyEventType
+  payload   Json?
+  createdAt DateTime          @default(now())
+}
+
+model EmergencyContact {
+  id           String   @id @default(uuid()) @db.Uuid
+  driverId     String   @db.Uuid
+  name         String
+  phone        String
+  relationship String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Pricing & Config ───
+
+model PricingConfig {
+  id           String              @id @default(uuid()) @db.Uuid
+  name         String
+  service      String
+  status       PricingConfigStatus @default(active)
+  pricingRules Json
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model PricingZone {
+  id          String                             @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  boundaries  Unsupported("geometry(Polygon, 4326)")
+  pricingRules Json                              @default("{}")
+  status      PricingConfigStatus                @default(active)
+  createdAt   DateTime                           @default(now())
+  updatedAt   DateTime                           @updatedAt
+}
+
+model Promo {
+  id            String          @id @default(uuid()) @db.Uuid
+  code          String          @unique
+  description   String
+  discountType  PromoDiscountType
+  discountValue Decimal         @db.Decimal(10, 2)
+  status        PromoStatus     @default(draft)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model ServiceConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  key           String   @unique
+  name          String
+  enabled       Boolean  @default(true)
+  configuration Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FeatureFlag {
+  id          String            @id @default(uuid()) @db.Uuid
+  key         String            @unique
+  enabled     Boolean           @default(false)
+  scope       FeatureFlagScope  @default(global)
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+// ─── Operations ───
+
+model Approval {
+  id          String            @id @default(uuid()) @db.Uuid
+  entityType  ApprovalEntityType
+  entityId    String            @db.Uuid
+  status      ApprovalStatus    @default(pending)
+  requestedBy String            @db.Uuid
+  reviewedBy  String?           @db.Uuid
+  notes       String?
+  createdAt   DateTime          @default(now())
+  reviewedAt  BigInt?
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorId     String   @db.Uuid
+  actorType   String
+  action      String
+  resource    String
+  resourceId  String?  @db.Uuid
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+}
+
+model RiskCase {
+  id          String       @id @default(uuid()) @db.Uuid
+  type        String
+  severity    RiskSeverity @default(medium)
+  status      RiskStatus   @default(open)
+  subjectType String
+  subjectId   String       @db.Uuid
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// ─── Documents ───
+
+model UserDocument {
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @db.Uuid
+  userType        String
+  documentType    String
+  fileUrl         String
+  expiryDate      String
+  status          DocumentStatus @default(under_review)
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// ─── Rider Service Requests (rental, tour, ambulance) ───
+
+model RiderServiceRequest {
+  id          String              @id @default(uuid()) @db.Uuid
+  riderId     String              @db.Uuid
+  driverId    String?             @db.Uuid
+  serviceType ServiceRequestType
+  status      String              @db.VarChar(64)
+  payload     Json                @default("{}")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NEW ENTITIES (previously in-memory only)
+// ═══════════════════════════════════════════════════════════════
+
+// ─── School Shuttle Domain ───
+
+model ShuttleRoute {
+  id          String   @id @default(uuid()) @db.Uuid
+  fleetId     String   @db.Uuid
+  name        String
+  description String?
+  startLocation Json
+  endLocation   Json
+  stops       Json     @default("[]")
+  schedule    Json     @default("{}")
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ShuttleStudent {
+  id          String   @id @default(uuid()) @db.Uuid
+  fleetId     String   @db.Uuid
+  routeId     String   @db.Uuid
+  name        String
+  grade       String?
+  parentName  String?
+  parentPhone String?
+  address     String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ShuttleAttendant {
+  id      String   @id @default(uuid()) @db.Uuid
+  fleetId String   @db.Uuid
+  routeId String   @db.Uuid
+  name    String
+  phone   String
+  email   String?
+  status  String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShuttleTrip {
+  id        String   @id @default(uuid()) @db.Uuid
+  fleetId   String   @db.Uuid
+  routeId   String   @db.Uuid
+  driverId  String?  @db.Uuid
+  vehicleId String?  @db.Uuid
+  status    String   @default("scheduled")
+  startTime DateTime?
+  endTime   DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShuttleAttendance {
+  id        String   @id @default(uuid()) @db.Uuid
+  fleetId   String   @db.Uuid
+  tripId    String   @db.Uuid
+  studentId String   @db.Uuid
+  date      DateTime
+  status    String   @default("present")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShuttlePayment {
+  id        String   @id @default(uuid()) @db.Uuid
+  fleetId   String   @db.Uuid
+  studentId String   @db.Uuid
+  amount    Decimal  @db.Decimal(10, 2)
+  currency  String   @default("UGX")
+  month     String
+  year      Int
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShuttleFeedback {
+  id        String   @id @default(uuid()) @db.Uuid
+  fleetId   String   @db.Uuid
+  tripId    String?  @db.Uuid
+  parentId  String?  @db.Uuid
+  rating    Int      @default(0)
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Admin Domain ───
+
+model AdminAgent {
+  id        String         @id @default(uuid()) @db.Uuid
+  name      String
+  email     String         @unique
+  role      String
+  status    AdminAgentStatus @default(active)
+  region    String?
+  metadata  Json?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model TrainingModule {
+  id        String               @id @default(uuid()) @db.Uuid
+  title     String
+  category  String
+  status    TrainingModuleStatus @default(draft)
+  version   Int                  @default(1)
+  content   String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+}
+
+model TaxConfig {
+  id               String   @id @default(uuid()) @db.Uuid
+  regionId         String   @unique
+  currency         String   @default("UGX")
+  vatPercent       Decimal  @default(0) @db.Decimal(5, 2)
+  serviceTaxPercent Decimal @default(0) @db.Decimal(5, 2)
+  surchargePercent Decimal  @default(0) @db.Decimal(5, 2)
+  notes            String?
+  updatedAt        DateTime @updatedAt
+}
+
+model InvoiceTemplate {
+  id         String   @id @default(uuid()) @db.Uuid
+  regionId   String
+  templateName String
+  prefix     String
+  nextNumber Int      @default(1001)
+  footer     String?
+  updatedAt  DateTime @updatedAt
+}
+
+model Policy {
+  id        String      @id @default(uuid()) @db.Uuid
+  key       String      @unique
+  title     String
+  scope     PolicyScope @default(global)
+  status    PolicyStatus @default(draft)
+  content   String
+  version   Int         @default(1)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model VerticalPolicy {
+  id        String                @id @default(uuid()) @db.Uuid
+  verticalId String               @unique
+  name      String
+  status    VerticalPolicyStatus  @default(active)
+  rules     Json                  @default("{}")
+  updatedAt DateTime              @updatedAt
+}
+
+// ─── Fleet Vehicle Maintenance ───
+
+model VehicleMaintenance {
+  id          String            @id @default(uuid()) @db.Uuid
+  vehicleId   String            @db.Uuid
+  fleetId     String?           @db.Uuid
+  type        MaintenanceType
+  status      MaintenanceStatus @default(scheduled)
+  date        DateTime
+  notes       String?
+  cost        Decimal?          @db.Decimal(10, 2)
+  provider    String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+// ─── Support Tickets ───
+
+model SupportTicket {
+  id        String              @id @default(uuid()) @db.Uuid
+  fleetId   String?             @db.Uuid
+  userId    String?             @db.Uuid
+  name      String
+  email     String
+  subject   String
+  message   String
+  category  String              @default("general")
+  status    SupportTicketStatus @default(open)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}

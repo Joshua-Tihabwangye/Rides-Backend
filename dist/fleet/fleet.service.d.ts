@@ -1,48 +1,52 @@
-import { Repository } from 'typeorm';
-import { FleetPartnerProfile } from '../entities/fleet-partner-profile.entity';
-import { FleetBranch } from '../entities/fleet-branch.entity';
-import { FleetDriver } from '../entities/fleet-driver.entity';
-import { FleetDispatch } from '../entities/fleet-dispatch.entity';
-import { FleetServiceRecord } from '../entities/fleet-service-record.entity';
-import { FleetPayout } from '../entities/fleet-payout.entity';
-import { FleetComplianceIncident } from '../entities/fleet-compliance-incident.entity';
-import { FleetTrainingCourse } from '../entities/fleet-training-course.entity';
-import { User } from '../entities/user.entity';
-import { DriverProfile } from '../entities/driver-profile.entity';
-import { Trip } from '../entities/trip.entity';
-import { JobOffer } from '../entities/job-offer.entity';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { Vehicle } from '../entities/vehicle.entity';
-import { RiderServiceRequest } from '../entities/rider-service-request.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { FleetRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 export declare class FleetService {
-    private fleetProfileRepo;
-    private fleetBranchRepo;
-    private fleetDriverRepo;
-    private fleetDispatchRepo;
-    private fleetServiceRepo;
-    private fleetPayoutRepo;
-    private complianceRepo;
-    private trainingRepo;
-    private userRepo;
-    private driverProfileRepo;
-    private tripRepo;
-    private jobOfferRepo;
-    private earningsLedgerRepo;
-    private vehicleRepo;
-    private riderServiceRequestRepo;
+    private readonly prisma;
     private readonly fleetRealtimeGateway;
     private readonly schoolOpsStore;
-    constructor(fleetProfileRepo: Repository<FleetPartnerProfile>, fleetBranchRepo: Repository<FleetBranch>, fleetDriverRepo: Repository<FleetDriver>, fleetDispatchRepo: Repository<FleetDispatch>, fleetServiceRepo: Repository<FleetServiceRecord>, fleetPayoutRepo: Repository<FleetPayout>, complianceRepo: Repository<FleetComplianceIncident>, trainingRepo: Repository<FleetTrainingCourse>, userRepo: Repository<User>, driverProfileRepo: Repository<DriverProfile>, tripRepo: Repository<Trip>, jobOfferRepo: Repository<JobOffer>, earningsLedgerRepo: Repository<EarningsLedger>, vehicleRepo: Repository<Vehicle>, riderServiceRequestRepo: Repository<RiderServiceRequest>, fleetRealtimeGateway: FleetRealtimeGateway);
-    getProfile(userId: string): Promise<FleetPartnerProfile>;
+    constructor(prisma: PrismaService, fleetRealtimeGateway: FleetRealtimeGateway);
+    getProfile(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetPartnerStatus;
+        companyName: string;
+        contactEmail: string | null;
+        contactPhone: string | null;
+        registrationNumber: string | null;
+        taxId: string | null;
+        id: string;
+        fleetId: string | null;
+        userId: string;
+        verticals: import("@prisma/client/runtime/client").JsonValue;
+    }>;
     updateProfile(userId: string, patch: Partial<{
         companyName: string;
         contactEmail: string;
         contactPhone: string;
         registrationNumber?: string;
         taxId?: string;
-    }>): Promise<FleetPartnerProfile>;
-    listBranches(userId: string): Promise<FleetBranch[]>;
+    }>): Promise<{
+        status: import(".prisma/client").$Enums.FleetPartnerStatus;
+        companyName: string;
+        contactEmail: string | null;
+        contactPhone: string | null;
+        registrationNumber: string | null;
+        taxId: string | null;
+        id: string;
+        fleetId: string | null;
+        userId: string;
+        verticals: import("@prisma/client/runtime/client").JsonValue;
+    }>;
+    listBranches(userId: string): Promise<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }[]>;
     createBranch(userId: string, input: {
         name: string;
         address?: string;
@@ -51,7 +55,18 @@ export declare class FleetService {
         phone?: string;
         managerName?: string;
         operatingHours?: Record<string, unknown>;
-    }): Promise<FleetBranch>;
+    }): Promise<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }>;
     patchBranch(userId: string, branchId: string, patch: Partial<{
         name: string;
         address?: string;
@@ -60,11 +75,37 @@ export declare class FleetService {
         phone?: string;
         managerName?: string;
         operatingHours?: Record<string, unknown>;
-    }>): Promise<FleetBranch>;
+    }>): Promise<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }>;
     deleteBranch(userId: string, branchId: string): Promise<{
         deleted: boolean;
     }>;
-    listDrivers(userId: string): Promise<FleetDriver[]>;
+    listDrivers(userId: string): Promise<{
+        email: string;
+        phone: string;
+        fullName: string;
+        city: string | null;
+        country: string | null;
+        status: import(".prisma/client").$Enums.FleetDriverStatus;
+        id: string;
+        driverId: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        branchId: string | null;
+        serviceModes: string[];
+    }[]>;
     createDriver(userId: string, input: {
         fullName: string;
         email: string;
@@ -73,7 +114,22 @@ export declare class FleetService {
         country?: string;
         branchId?: string;
         serviceModes?: string[];
-    }): Promise<FleetDriver>;
+    }): Promise<{
+        email: string;
+        phone: string;
+        fullName: string;
+        city: string | null;
+        country: string | null;
+        status: import(".prisma/client").$Enums.FleetDriverStatus;
+        id: string;
+        driverId: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        branchId: string | null;
+        serviceModes: string[];
+    }>;
     patchDriver(userId: string, driverId: string, patch: Partial<{
         fullName: string;
         email: string;
@@ -83,8 +139,36 @@ export declare class FleetService {
         branchId?: string;
         status: 'invited' | 'active' | 'suspended';
         serviceModes: string[];
-    }>): Promise<FleetDriver>;
-    listDispatches(userId: string, type?: string): Promise<FleetDispatch[]>;
+    }>): Promise<{
+        email: string;
+        phone: string;
+        fullName: string;
+        city: string | null;
+        country: string | null;
+        status: import(".prisma/client").$Enums.FleetDriverStatus;
+        id: string;
+        driverId: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        branchId: string | null;
+        serviceModes: string[];
+    } | null>;
+    listDispatches(userId: string, type?: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetDispatchStatus;
+        notes: string | null;
+        type: string;
+        id: string;
+        driverId: string | null;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        tripId: string | null;
+        pickup: string;
+        dropoff: string;
+        vehicleId: string | null;
+    }[]>;
     createDispatch(userId: string, input: {
         driverId?: string;
         vehicleId?: string;
@@ -93,17 +177,110 @@ export declare class FleetService {
         dropoff: string;
         notes?: string;
     }, forcedType?: string): Promise<{
-        dispatch: FleetDispatch;
-        trip: Trip;
+        dispatch: {
+            status: import(".prisma/client").$Enums.FleetDispatchStatus;
+            notes: string | null;
+            type: string;
+            id: string;
+            driverId: string | null;
+            fleetId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            tripId: string | null;
+            pickup: string;
+            dropoff: string;
+            vehicleId: string | null;
+        };
+        trip: {
+            status: import(".prisma/client").$Enums.TripStatus;
+            type: import(".prisma/client").$Enums.TripType;
+            id: string;
+            driverId: string | null;
+            riderId: string;
+            fleetId: string | null;
+            createdAt: Date;
+            updatedAt: Date;
+            rating: import("@prisma/client/runtime/client").JsonValue | null;
+            fleetPartnerId: string | null;
+            pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+            dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+            pickup: string | null;
+            dropoff: string | null;
+            pickupAddress: string;
+            dropoffAddress: string;
+            route: import("@prisma/client/runtime/client").JsonValue | null;
+            fare: import("@prisma/client-runtime-utils").Decimal;
+            driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+            platformFee: import("@prisma/client-runtime-utils").Decimal;
+            payment: import("@prisma/client/runtime/client").JsonValue | null;
+            otpCode: string | null;
+            scheduledAt: Date | null;
+            startedAt: Date | null;
+            completedAt: Date | null;
+            cancelledAt: Date | null;
+            cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+            driverArrivedAt: Date | null;
+        };
     }>;
-    listTrips(userId: string): Promise<Trip[]>;
-    listServices(userId: string, service: string): Promise<FleetServiceRecord[]>;
+    listTrips(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.TripStatus;
+        type: import(".prisma/client").$Enums.TripType;
+        id: string;
+        driverId: string | null;
+        riderId: string;
+        fleetId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        rating: import("@prisma/client/runtime/client").JsonValue | null;
+        fleetPartnerId: string | null;
+        pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+        dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+        pickup: string | null;
+        dropoff: string | null;
+        pickupAddress: string;
+        dropoffAddress: string;
+        route: import("@prisma/client/runtime/client").JsonValue | null;
+        fare: import("@prisma/client-runtime-utils").Decimal;
+        driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+        platformFee: import("@prisma/client-runtime-utils").Decimal;
+        payment: import("@prisma/client/runtime/client").JsonValue | null;
+        otpCode: string | null;
+        scheduledAt: Date | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        cancelledAt: Date | null;
+        cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+        driverArrivedAt: Date | null;
+    }[]>;
+    listServices(userId: string, service: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetServiceStatus;
+        notes: string | null;
+        service: import(".prisma/client").$Enums.FleetService;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scheduledAt: bigint;
+        customerName: string;
+        assetId: string | null;
+    }[]>;
     createService(userId: string, service: string, input: {
         customerName: string;
         assetId?: string;
         scheduledAt: number;
         notes?: string;
-    }): Promise<FleetServiceRecord>;
+    }): Promise<{
+        status: import(".prisma/client").$Enums.FleetServiceStatus;
+        notes: string | null;
+        service: import(".prisma/client").$Enums.FleetService;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scheduledAt: bigint;
+        customerName: string;
+        assetId: string | null;
+    }>;
     getEarningsSummary(userId: string, period?: 'day' | 'week' | 'month' | 'quarter' | 'year'): Promise<{
         period: "day" | "week" | "month" | "quarter" | "year";
         total: number;
@@ -115,33 +292,100 @@ export declare class FleetService {
         total: number;
         currency: string;
     }[]>;
-    getPayouts(userId: string): Promise<FleetPayout[]>;
-    listComplianceIncidents(userId: string): Promise<FleetComplianceIncident[]>;
+    getPayouts(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetPayoutStatus;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        currency: string;
+    }[]>;
+    listComplianceIncidents(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetComplianceStatus;
+        description: string;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        severity: import(".prisma/client").$Enums.FleetComplianceSeverity;
+        category: string;
+    }[]>;
     createComplianceIncident(userId: string, input: {
         category: string;
         severity: string;
         description: string;
-    }): Promise<FleetComplianceIncident>;
-    listTrainingCourses(userId: string): Promise<FleetTrainingCourse[]>;
+    }): Promise<{
+        status: import(".prisma/client").$Enums.FleetComplianceStatus;
+        description: string;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        severity: import(".prisma/client").$Enums.FleetComplianceSeverity;
+        category: string;
+    }>;
+    listTrainingCourses(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetTrainingStatus;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        assignedTo: string | null;
+    }[]>;
     createTrainingCourse(userId: string, input: {
         title: string;
         assignedTo?: string;
-    }): Promise<FleetTrainingCourse>;
+    }): Promise<{
+        status: import(".prisma/client").$Enums.FleetTrainingStatus;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        assignedTo: string | null;
+    }>;
     listRiderServiceRequests(userId: string, query?: Partial<{
         serviceType: 'rental' | 'tour' | 'ambulance';
         status: string;
     }>): Promise<{
         id: string;
         riderId: string;
-        driverId: string;
-        serviceType: "rental" | "tour" | "ambulance";
+        driverId: string | null;
+        serviceType: import(".prisma/client").$Enums.ServiceRequestType;
         status: string;
-        payload: Record<string, any>;
+        payload: import("@prisma/client/runtime/client").JsonValue;
         createdAt: number;
         updatedAt: number;
     }[]>;
-    getBranchById(userId: string, branchId: string): Promise<FleetBranch>;
-    getDriverById(userId: string, driverId: string): Promise<FleetDriver>;
+    getBranchById(userId: string, branchId: string): Promise<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }>;
+    getDriverById(userId: string, driverId: string): Promise<{
+        email: string;
+        phone: string;
+        fullName: string;
+        city: string | null;
+        country: string | null;
+        status: import(".prisma/client").$Enums.FleetDriverStatus;
+        id: string;
+        driverId: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        branchId: string | null;
+        serviceModes: string[];
+    }>;
     deleteDriver(userId: string, driverId: string): Promise<{
         deleted: boolean;
     }>;
@@ -170,7 +414,20 @@ export declare class FleetService {
         servicedAt: number;
         createdAt: number;
     }>;
-    getDispatchById(userId: string, dispatchId: string): Promise<FleetDispatch>;
+    getDispatchById(userId: string, dispatchId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetDispatchStatus;
+        notes: string | null;
+        type: string;
+        id: string;
+        driverId: string | null;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        tripId: string | null;
+        pickup: string;
+        dropoff: string;
+        vehicleId: string | null;
+    }>;
     patchDispatch(userId: string, dispatchId: string, patch: Partial<{
         pickup: string;
         dropoff: string;
@@ -178,36 +435,129 @@ export declare class FleetService {
         status: string;
         driverId: string;
         vehicleId: string;
-    }>): Promise<FleetDispatch>;
+    }>): Promise<{
+        status: import(".prisma/client").$Enums.FleetDispatchStatus;
+        notes: string | null;
+        type: string;
+        id: string;
+        driverId: string | null;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        tripId: string | null;
+        pickup: string;
+        dropoff: string;
+        vehicleId: string | null;
+    }>;
     deleteDispatch(userId: string, dispatchId: string): Promise<{
         deleted: boolean;
     }>;
     assignDispatch(userId: string, dispatchId: string, input: {
         driverId?: string;
         vehicleId?: string;
-    }): Promise<FleetDispatch>;
-    getServiceById(userId: string, service: string, serviceId: string): Promise<FleetServiceRecord>;
+    }): Promise<{
+        status: import(".prisma/client").$Enums.FleetDispatchStatus;
+        notes: string | null;
+        type: string;
+        id: string;
+        driverId: string | null;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        tripId: string | null;
+        pickup: string;
+        dropoff: string;
+        vehicleId: string | null;
+    }>;
+    getServiceById(userId: string, service: string, serviceId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetServiceStatus;
+        notes: string | null;
+        service: import(".prisma/client").$Enums.FleetService;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scheduledAt: bigint;
+        customerName: string;
+        assetId: string | null;
+    }>;
     patchServiceById(userId: string, service: string, serviceId: string, patch: Partial<{
         customerName: string;
         assetId: string;
         scheduledAt: number;
         notes: string;
         status: string;
-    }>): Promise<FleetServiceRecord>;
-    cancelServiceById(userId: string, service: string, serviceId: string, reason?: string): Promise<FleetServiceRecord>;
-    getComplianceIncidentById(userId: string, incidentId: string): Promise<FleetComplianceIncident>;
+    }>): Promise<{
+        status: import(".prisma/client").$Enums.FleetServiceStatus;
+        notes: string | null;
+        service: import(".prisma/client").$Enums.FleetService;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scheduledAt: bigint;
+        customerName: string;
+        assetId: string | null;
+    }>;
+    cancelServiceById(userId: string, service: string, serviceId: string, reason?: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetServiceStatus;
+        notes: string | null;
+        service: import(".prisma/client").$Enums.FleetService;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        scheduledAt: bigint;
+        customerName: string;
+        assetId: string | null;
+    }>;
+    getComplianceIncidentById(userId: string, incidentId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetComplianceStatus;
+        description: string;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        severity: import(".prisma/client").$Enums.FleetComplianceSeverity;
+        category: string;
+    }>;
     patchComplianceIncidentById(userId: string, incidentId: string, patch: Partial<{
         category: string;
         severity: string;
         status: string;
         description: string;
-    }>): Promise<FleetComplianceIncident>;
-    getTrainingCourseById(userId: string, courseId: string): Promise<FleetTrainingCourse>;
+    }>): Promise<{
+        status: import(".prisma/client").$Enums.FleetComplianceStatus;
+        description: string;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        severity: import(".prisma/client").$Enums.FleetComplianceSeverity;
+        category: string;
+    }>;
+    getTrainingCourseById(userId: string, courseId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetTrainingStatus;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        assignedTo: string | null;
+    }>;
     patchTrainingCourseById(userId: string, courseId: string, patch: Partial<{
         title: string;
         status: string;
         assignedTo?: string;
-    }>): Promise<FleetTrainingCourse>;
+    }>): Promise<{
+        status: import(".prisma/client").$Enums.FleetTrainingStatus;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        assignedTo: string | null;
+    }>;
     deleteTrainingCourseById(userId: string, courseId: string): Promise<{
         deleted: boolean;
     }>;
@@ -216,7 +566,14 @@ export declare class FleetService {
         total: number;
         currency: string;
     }>;
-    getPayoutById(userId: string, payoutId: string): Promise<FleetPayout>;
+    getPayoutById(userId: string, payoutId: string): Promise<{
+        status: import(".prisma/client").$Enums.FleetPayoutStatus;
+        id: string;
+        fleetId: string;
+        createdAt: Date;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        currency: string;
+    }>;
     private getSchoolStore;
     schoolListRoutes(userId: string): Promise<Record<string, unknown>[]>;
     schoolCreateRoute(userId: string, input: Record<string, unknown>): Promise<{

@@ -1,9 +1,8 @@
-import { Repository } from 'typeorm';
-import { FeatureFlag } from '../entities/feature-flag.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import type { AppBehaviorContract, AppCanonicalContract, AppId, CompatibilityBootstrapPayload } from './contracts.types';
 export declare class CompatibilityContractService {
-    private featureFlagRepo;
-    constructor(featureFlagRepo: Repository<FeatureFlag>);
+    private readonly prisma;
+    constructor(prisma: PrismaService);
     private readonly contracts;
     private readonly canonicalContracts;
     getContracts(): AppBehaviorContract[];
@@ -14,7 +13,15 @@ export declare class CompatibilityContractService {
     getRuntimeFlags(appId: AppId): Promise<{
         appId: AppId;
         backendEnabled: boolean;
-        flags: FeatureFlag[];
+        flags: {
+            description: string | null;
+            key: string;
+            enabled: boolean;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            scope: import(".prisma/client").$Enums.FeatureFlagScope;
+        }[];
     }>;
     signInCompat(appId: AppId, input: {
         email: string;

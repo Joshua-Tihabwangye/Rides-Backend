@@ -1,39 +1,54 @@
-import { Repository } from 'typeorm';
+import { PrismaService } from '../prisma/prisma.service';
 import { PresenceLocationService } from '../presence-location/presence-location.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import type { RequestRiderTripDto, UpdateRiderTripTrackingDto } from './dto/rider.dto';
-import { RiderProfile } from '../entities/rider-profile.entity';
-import { Trip } from '../entities/trip.entity';
-import { JobOffer } from '../entities/job-offer.entity';
-import { Notification } from '../entities/notification.entity';
-import { User } from '../entities/user.entity';
-import { WalletAccount } from '../entities/wallet-account.entity';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { RiderServiceRequest } from '../entities/rider-service-request.entity';
 export declare class RiderService {
-    private riderProfileRepo;
-    private tripRepo;
-    private jobOfferRepo;
-    private notificationRepo;
-    private userRepo;
-    private walletRepo;
-    private earningsLedgerRepo;
-    private riderServiceRequestRepo;
+    private readonly prisma;
     private readonly presenceLocationService?;
     private readonly realtimeGateway?;
     private readonly riderRealtimeGateway?;
     private readonly commuteStore;
     private readonly paymentIntentStore;
-    constructor(riderProfileRepo: Repository<RiderProfile>, tripRepo: Repository<Trip>, jobOfferRepo: Repository<JobOffer>, notificationRepo: Repository<Notification>, userRepo: Repository<User>, walletRepo: Repository<WalletAccount>, earningsLedgerRepo: Repository<EarningsLedger>, riderServiceRequestRepo: Repository<RiderServiceRequest>, presenceLocationService?: PresenceLocationService | undefined, realtimeGateway?: RealtimeGateway | undefined, riderRealtimeGateway?: RiderRealtimeGateway | undefined);
-    getProfile(userId: string): Promise<RiderProfile>;
+    constructor(prisma: PrismaService, presenceLocationService?: PresenceLocationService | undefined, realtimeGateway?: RealtimeGateway | undefined, riderRealtimeGateway?: RiderRealtimeGateway | undefined);
+    getProfile(userId: string): Promise<{
+        preferences: any;
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+        phone: string | null;
+        fullName: string | null;
+        city: string | null;
+        country: string | null;
+        id: string;
+        riderId: string | null;
+        userId: string;
+        preferredCurrency: string;
+        rating: import("@prisma/client-runtime-utils").Decimal;
+        totalTrips: number;
+    }>;
     updateProfile(userId: string, patch: Partial<{
         fullName: string;
         phone: string;
         city: string;
         country: string;
         preferredCurrency: string;
-    }>): Promise<RiderProfile>;
+    }>): Promise<{
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+        phone: string | null;
+        fullName: string | null;
+        city: string | null;
+        country: string | null;
+        id: string;
+        riderId: string | null;
+        userId: string;
+        preferredCurrency: string;
+        preferences: import("@prisma/client/runtime/client").JsonValue;
+        rating: import("@prisma/client-runtime-utils").Decimal;
+        totalTrips: number;
+    }>;
     getPreferences(userId: string): Promise<{
         preferredLanguages: any[];
         notificationSettings: {
@@ -209,8 +224,8 @@ export declare class RiderService {
     }>;
     listWalletTransfers(userId: string): Promise<Record<string, unknown>[]>;
     listRentals(userId: string): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         vehicleId: string;
         vehicleName: string;
         status: "active" | "completed" | "cancelled" | "upcoming";
@@ -221,8 +236,8 @@ export declare class RiderService {
         createdAt: number;
     }[]>;
     getRentalById(userId: string, rentalId: string): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         vehicleId: string;
         vehicleName: string;
         status: "active" | "completed" | "cancelled" | "upcoming";
@@ -242,8 +257,8 @@ export declare class RiderService {
             address: string;
         };
     }): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         vehicleId: string;
         vehicleName: string;
         status: "active" | "completed" | "cancelled" | "upcoming";
@@ -254,8 +269,8 @@ export declare class RiderService {
         createdAt: number;
     }>;
     patchRental(userId: string, rentalId: string, patch: Partial<Record<string, unknown>>): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         vehicleId: string;
         vehicleName: string;
         status: "active" | "completed" | "cancelled" | "upcoming";
@@ -266,8 +281,8 @@ export declare class RiderService {
         createdAt: number;
     }>;
     cancelRental(userId: string, rentalId: string, reason?: string): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         vehicleId: string;
         vehicleName: string;
         status: "active" | "completed" | "cancelled" | "upcoming";
@@ -278,8 +293,8 @@ export declare class RiderService {
         createdAt: number;
     }>;
     listTours(userId: string): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         tourId: string;
         tourName: string;
         status: "in_progress" | "completed" | "cancelled" | "booked";
@@ -290,8 +305,8 @@ export declare class RiderService {
         createdAt: number;
     }[]>;
     getTourById(userId: string, tourId: string): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         tourId: string;
         tourName: string;
         status: "in_progress" | "completed" | "cancelled" | "booked";
@@ -307,8 +322,8 @@ export declare class RiderService {
         participantsCount: number;
         specialRequests?: string;
     }): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         tourId: string;
         tourName: string;
         status: "in_progress" | "completed" | "cancelled" | "booked";
@@ -319,8 +334,8 @@ export declare class RiderService {
         createdAt: number;
     }>;
     cancelTour(userId: string, tourId: string, reason?: string): Promise<{
-        id: string;
-        riderId: string;
+        id: any;
+        riderId: any;
         tourId: string;
         tourName: string;
         status: "in_progress" | "completed" | "cancelled" | "booked";
@@ -331,9 +346,9 @@ export declare class RiderService {
         createdAt: number;
     }>;
     listAmbulances(userId: string): Promise<{
-        id: string;
-        riderId: string;
-        driverId: string | undefined;
+        id: any;
+        riderId: any;
+        driverId: any;
         status: "requested" | "arrived" | "in_progress" | "completed" | "cancelled" | "dispatched" | "en_route";
         pickupAddress: string;
         dropoffAddress: string | undefined;
@@ -343,9 +358,9 @@ export declare class RiderService {
         updatedAt: number;
     }[]>;
     getAmbulanceById(userId: string, ambulanceId: string): Promise<{
-        id: string;
-        riderId: string;
-        driverId: string | undefined;
+        id: any;
+        riderId: any;
+        driverId: any;
         status: "requested" | "arrived" | "in_progress" | "completed" | "cancelled" | "dispatched" | "en_route";
         pickupAddress: string;
         dropoffAddress: string | undefined;
@@ -362,9 +377,9 @@ export declare class RiderService {
         hospitalName?: string;
         priority?: 'normal' | 'urgent' | 'emergency';
     }): Promise<{
-        id: string;
-        riderId: string;
-        driverId: string | undefined;
+        id: any;
+        riderId: any;
+        driverId: any;
         status: "requested" | "arrived" | "in_progress" | "completed" | "cancelled" | "dispatched" | "en_route";
         pickupAddress: string;
         dropoffAddress: string | undefined;
@@ -374,9 +389,9 @@ export declare class RiderService {
         updatedAt: number;
     }>;
     patchAmbulance(userId: string, ambulanceId: string, patch: Partial<Record<string, unknown>>): Promise<{
-        id: string;
-        riderId: string;
-        driverId: string | undefined;
+        id: any;
+        riderId: any;
+        driverId: any;
         status: "requested" | "arrived" | "in_progress" | "completed" | "cancelled" | "dispatched" | "en_route";
         pickupAddress: string;
         dropoffAddress: string | undefined;
@@ -386,9 +401,9 @@ export declare class RiderService {
         updatedAt: number;
     }>;
     cancelAmbulance(userId: string, ambulanceId: string, reason?: string): Promise<{
-        id: string;
-        riderId: string;
-        driverId: string | undefined;
+        id: any;
+        riderId: any;
+        driverId: any;
         status: "requested" | "arrived" | "in_progress" | "completed" | "cancelled" | "dispatched" | "en_route";
         pickupAddress: string;
         dropoffAddress: string | undefined;
@@ -397,38 +412,177 @@ export declare class RiderService {
         requestedAt: number;
         updatedAt: number;
     }>;
-    listTrips(userId: string): Promise<Trip[]>;
-    getActiveTrip(userId: string): Promise<Trip | null>;
-    getTripById(userId: string, tripId: string): Promise<Trip>;
+    listTrips(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.TripStatus;
+        type: import(".prisma/client").$Enums.TripType;
+        id: string;
+        driverId: string | null;
+        riderId: string;
+        fleetId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        rating: import("@prisma/client/runtime/client").JsonValue | null;
+        fleetPartnerId: string | null;
+        pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+        dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+        pickup: string | null;
+        dropoff: string | null;
+        pickupAddress: string;
+        dropoffAddress: string;
+        route: import("@prisma/client/runtime/client").JsonValue | null;
+        fare: import("@prisma/client-runtime-utils").Decimal;
+        driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+        platformFee: import("@prisma/client-runtime-utils").Decimal;
+        payment: import("@prisma/client/runtime/client").JsonValue | null;
+        otpCode: string | null;
+        scheduledAt: Date | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        cancelledAt: Date | null;
+        cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+        driverArrivedAt: Date | null;
+    }[]>;
+    getActiveTrip(userId: string): Promise<{
+        status: import(".prisma/client").$Enums.TripStatus;
+        type: import(".prisma/client").$Enums.TripType;
+        id: string;
+        driverId: string | null;
+        riderId: string;
+        fleetId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        rating: import("@prisma/client/runtime/client").JsonValue | null;
+        fleetPartnerId: string | null;
+        pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+        dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+        pickup: string | null;
+        dropoff: string | null;
+        pickupAddress: string;
+        dropoffAddress: string;
+        route: import("@prisma/client/runtime/client").JsonValue | null;
+        fare: import("@prisma/client-runtime-utils").Decimal;
+        driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+        platformFee: import("@prisma/client-runtime-utils").Decimal;
+        payment: import("@prisma/client/runtime/client").JsonValue | null;
+        otpCode: string | null;
+        scheduledAt: Date | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        cancelledAt: Date | null;
+        cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+        driverArrivedAt: Date | null;
+    } | null>;
+    getTripById(userId: string, tripId: string): Promise<{
+        status: import(".prisma/client").$Enums.TripStatus;
+        type: import(".prisma/client").$Enums.TripType;
+        id: string;
+        driverId: string | null;
+        riderId: string;
+        fleetId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        rating: import("@prisma/client/runtime/client").JsonValue | null;
+        fleetPartnerId: string | null;
+        pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+        dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+        pickup: string | null;
+        dropoff: string | null;
+        pickupAddress: string;
+        dropoffAddress: string;
+        route: import("@prisma/client/runtime/client").JsonValue | null;
+        fare: import("@prisma/client-runtime-utils").Decimal;
+        driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+        platformFee: import("@prisma/client-runtime-utils").Decimal;
+        payment: import("@prisma/client/runtime/client").JsonValue | null;
+        otpCode: string | null;
+        scheduledAt: Date | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        cancelledAt: Date | null;
+        cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+        driverArrivedAt: Date | null;
+    }>;
     requestTrip(userId: string, input: RequestRiderTripDto): Promise<{
-        trip: Trip;
+        trip: {
+            status: import(".prisma/client").$Enums.TripStatus;
+            type: import(".prisma/client").$Enums.TripType;
+            id: string;
+            driverId: string | null;
+            riderId: string;
+            fleetId: string | null;
+            createdAt: Date;
+            updatedAt: Date;
+            rating: import("@prisma/client/runtime/client").JsonValue | null;
+            fleetPartnerId: string | null;
+            pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+            dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+            pickup: string | null;
+            dropoff: string | null;
+            pickupAddress: string;
+            dropoffAddress: string;
+            route: import("@prisma/client/runtime/client").JsonValue | null;
+            fare: import("@prisma/client-runtime-utils").Decimal;
+            driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+            platformFee: import("@prisma/client-runtime-utils").Decimal;
+            payment: import("@prisma/client/runtime/client").JsonValue | null;
+            otpCode: string | null;
+            scheduledAt: Date | null;
+            startedAt: Date | null;
+            completedAt: Date | null;
+            cancelledAt: Date | null;
+            cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+            driverArrivedAt: Date | null;
+        };
         jobOffers: {
             distanceMeters: number;
+            status: import(".prisma/client").$Enums.JobOfferStatus;
+            type: string | null;
+            expiresAt: Date | null;
             id: string;
-            tripId: string;
             driverId: string;
-            riderId: string;
-            status: string;
-            type: string;
-            pickup: string;
-            dropoff: string;
-            pickupLocation: {
-                lat: number;
-                lng: number;
-            };
-            dropoffLocation: {
-                lat: number;
-                lng: number;
-            };
-            estimatedFare: number;
-            route: Record<string, any>;
-            expiresAt: Date;
-            respondedAt: Date;
+            riderId: string | null;
             createdAt: Date;
+            tripId: string;
+            pickupLocation: import("@prisma/client/runtime/client").JsonValue | null;
+            dropoffLocation: import("@prisma/client/runtime/client").JsonValue | null;
+            pickup: string | null;
+            dropoff: string | null;
+            route: import("@prisma/client/runtime/client").JsonValue | null;
+            estimatedFare: import("@prisma/client-runtime-utils").Decimal;
+            respondedAt: Date | null;
         }[];
         nearbyDriverCount: number;
     }>;
-    updateTripTracking(userId: string, tripId: string, patch: UpdateRiderTripTrackingDto): Promise<Trip>;
+    updateTripTracking(userId: string, tripId: string, patch: UpdateRiderTripTrackingDto): Promise<{
+        status: import(".prisma/client").$Enums.TripStatus;
+        type: import(".prisma/client").$Enums.TripType;
+        id: string;
+        driverId: string | null;
+        riderId: string;
+        fleetId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        rating: import("@prisma/client/runtime/client").JsonValue | null;
+        fleetPartnerId: string | null;
+        pickupLocation: import("@prisma/client/runtime/client").JsonValue;
+        dropoffLocation: import("@prisma/client/runtime/client").JsonValue;
+        pickup: string | null;
+        dropoff: string | null;
+        pickupAddress: string;
+        dropoffAddress: string;
+        route: import("@prisma/client/runtime/client").JsonValue | null;
+        fare: import("@prisma/client-runtime-utils").Decimal;
+        driverEarnings: import("@prisma/client-runtime-utils").Decimal;
+        platformFee: import("@prisma/client-runtime-utils").Decimal;
+        payment: import("@prisma/client/runtime/client").JsonValue | null;
+        otpCode: string | null;
+        scheduledAt: Date | null;
+        startedAt: Date | null;
+        completedAt: Date | null;
+        cancelledAt: Date | null;
+        cancellationReason: import("@prisma/client/runtime/client").JsonValue | null;
+        driverArrivedAt: Date | null;
+    }>;
     private createRequestedTrip;
     private mapTrackingStatus;
     private mapRentalRecord;

@@ -8,93 +8,89 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SafetyService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
+const prisma_service_1 = require("../prisma/prisma.service");
 const crypto_1 = require("crypto");
-const safety_event_entity_1 = require("../entities/safety-event.entity");
-const emergency_contact_entity_1 = require("../entities/emergency-contact.entity");
-const driver_profile_entity_1 = require("../entities/driver-profile.entity");
 let SafetyService = class SafetyService {
-    constructor(safetyEventRepo, emergencyContactRepo, driverProfileRepo) {
-        this.safetyEventRepo = safetyEventRepo;
-        this.emergencyContactRepo = emergencyContactRepo;
-        this.driverProfileRepo = driverProfileRepo;
+    constructor(prisma) {
+        this.prisma = prisma;
         this.shareContactsStore = new Map();
         this.trainingModuleStore = new Map();
     }
     async requestTemporaryStop(driverId, tripId, note = '') {
-        const event = this.safetyEventRepo.create({
-            driverId,
-            tripId,
-            type: 'temporary_stop',
-            payload: {
-                status: 'stop_requested',
-                note,
-                requestedAt: new Date().toISOString(),
+        return this.prisma.safetyEvent.create({
+            data: {
+                driverId,
+                tripId,
+                type: 'temporary_stop',
+                payload: {
+                    status: 'stop_requested',
+                    note,
+                    requestedAt: new Date().toISOString(),
+                },
             },
         });
-        return this.safetyEventRepo.save(event);
     }
     async respondTemporaryStop(driverId, tripId, decision) {
-        const event = this.safetyEventRepo.create({
-            driverId,
-            tripId,
-            type: 'temporary_stop',
-            payload: {
-                status: decision === 'confirm' ? 'temporarily_stopped' : 'idle',
-                decision,
-                respondedAt: new Date().toISOString(),
+        return this.prisma.safetyEvent.create({
+            data: {
+                driverId,
+                tripId,
+                type: 'temporary_stop',
+                payload: {
+                    status: decision === 'confirm' ? 'temporarily_stopped' : 'idle',
+                    decision,
+                    respondedAt: new Date().toISOString(),
+                },
             },
         });
-        return this.safetyEventRepo.save(event);
     }
     async resumeTemporaryStop(driverId, tripId) {
-        const event = this.safetyEventRepo.create({
-            driverId,
-            tripId,
-            type: 'temporary_stop',
-            payload: {
-                status: 'idle',
-                resumedAt: new Date().toISOString(),
+        return this.prisma.safetyEvent.create({
+            data: {
+                driverId,
+                tripId,
+                type: 'temporary_stop',
+                payload: {
+                    status: 'idle',
+                    resumedAt: new Date().toISOString(),
+                },
             },
         });
-        return this.safetyEventRepo.save(event);
     }
     async respondSafetyCheck(driverId, tripId, actor, action) {
-        const event = this.safetyEventRepo.create({
-            driverId,
-            tripId,
-            type: 'safety_check',
-            payload: {
-                actor,
-                action,
-                respondedAt: new Date().toISOString(),
+        return this.prisma.safetyEvent.create({
+            data: {
+                driverId,
+                tripId,
+                type: 'safety_check',
+                payload: {
+                    actor,
+                    action,
+                    respondedAt: new Date().toISOString(),
+                },
             },
         });
-        return this.safetyEventRepo.save(event);
     }
     async triggerSos(driverId, tripId, payload) {
-        const event = this.safetyEventRepo.create({
-            driverId,
-            tripId,
-            type: 'sos',
-            payload: {
-                ...payload,
-                triggeredAt: new Date().toISOString(),
+        return this.prisma.safetyEvent.create({
+            data: {
+                driverId,
+                tripId,
+                type: 'sos',
+                payload: {
+                    ...payload,
+                    triggeredAt: new Date().toISOString(),
+                },
             },
         });
-        return this.safetyEventRepo.save(event);
     }
     async getTripSafetyState(driverId, tripId) {
-        const events = await this.safetyEventRepo.find({
+        const events = await this.prisma.safetyEvent.findMany({
             where: { driverId, tripId },
-            order: { createdAt: 'DESC' },
+            orderBy: { createdAt: 'desc' },
             take: 50,
         });
         const temporaryStop = events.find((event) => event.type === 'temporary_stop');
@@ -133,53 +129,57 @@ let SafetyService = class SafetyService {
         };
     }
     async saveTripSafetyState(driverId, tripId, state) {
-        const event = this.safetyEventRepo.create({
-            driverId,
-            tripId,
-            type: 'safety_check',
-            payload: {
-                status: 'resolved',
-                snapshot: state,
-                updatedAt: new Date().toISOString(),
+        await this.prisma.safetyEvent.create({
+            data: {
+                driverId,
+                tripId,
+                type: 'safety_check',
+                payload: {
+                    status: 'resolved',
+                    snapshot: state,
+                    updatedAt: new Date().toISOString(),
+                },
             },
         });
-        await this.safetyEventRepo.save(event);
         return this.getTripSafetyState(driverId, tripId);
     }
     async listEmergencyContacts(driverId) {
-        return this.emergencyContactRepo.find({ where: { driverId } });
+        return this.prisma.emergencyContact.findMany({ where: { driverId } });
     }
     async createEmergencyContact(driverId, input) {
-        const contact = this.emergencyContactRepo.create({
-            driverId,
-            name: input.name,
-            phone: input.phone,
-            relationship: input.relationship,
+        const contact = await this.prisma.emergencyContact.create({
+            data: {
+                driverId,
+                name: input.name,
+                phone: input.phone,
+                relationship: input.relationship,
+            },
         });
-        await this.emergencyContactRepo.save(contact);
-        const profile = await this.driverProfileRepo.findOne({ where: { userId: driverId } });
+        const profile = await this.prisma.driverProfile.findFirst({ where: { userId: driverId } });
         if (profile) {
-            profile.checkpoints = {
-                ...(profile.checkpoints || {}),
-                emergencyContactReady: true,
-            };
-            await this.driverProfileRepo.save(profile);
+            const checkpoints = profile.checkpoints || {};
+            await this.prisma.driverProfile.update({
+                where: { id: profile.id },
+                data: {
+                    checkpoints: { ...checkpoints, emergencyContactReady: true },
+                },
+            });
         }
         return contact;
     }
     async patchEmergencyContact(driverId, contactId, patch) {
-        const contact = await this.emergencyContactRepo.findOne({ where: { id: contactId, driverId } });
+        const contact = await this.prisma.emergencyContact.findFirst({ where: { id: contactId, driverId } });
         if (!contact) {
             throw new common_1.NotFoundException('Emergency contact not found');
         }
-        Object.assign(contact, patch);
-        return this.emergencyContactRepo.save(contact);
+        return this.prisma.emergencyContact.update({ where: { id: contactId }, data: patch });
     }
     async deleteEmergencyContact(driverId, contactId) {
-        const result = await this.emergencyContactRepo.delete({ id: contactId, driverId });
-        if (result.affected === 0) {
+        const contact = await this.prisma.emergencyContact.findFirst({ where: { id: contactId, driverId } });
+        if (!contact) {
             throw new common_1.NotFoundException('Emergency contact not found');
         }
+        await this.prisma.emergencyContact.delete({ where: { id: contactId } });
         return { deleted: true };
     }
     async listTripShareContacts(driverId, tripId) {
@@ -278,11 +278,6 @@ let SafetyService = class SafetyService {
 exports.SafetyService = SafetyService;
 exports.SafetyService = SafetyService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(safety_event_entity_1.SafetyEvent)),
-    __param(1, (0, typeorm_1.InjectRepository)(emergency_contact_entity_1.EmergencyContact)),
-    __param(2, (0, typeorm_1.InjectRepository)(driver_profile_entity_1.DriverProfile)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], SafetyService);
 //# sourceMappingURL=safety.service.js.map

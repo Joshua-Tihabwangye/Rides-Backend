@@ -7,18 +7,118 @@ export declare class AdminConfigController {
     private readonly adminService;
     private readonly apiResponse;
     constructor(adminService: AdminService, apiResponse: ApiResponseService);
-    listPricing(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/pricing-config.entity").PricingConfig[]>>;
-    getPricing(pricingId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/pricing-config.entity").PricingConfig>>;
-    createPricing(user: AuthenticatedUser, body: CreatePricingConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/pricing-config.entity").PricingConfig>>;
-    patchPricing(user: AuthenticatedUser, pricingId: string, body: UpdatePricingConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/pricing-config.entity").PricingConfig>>;
-    listPromos(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/promo.entity").Promo[]>>;
-    getPromo(promoId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/promo.entity").Promo>>;
-    createPromo(user: AuthenticatedUser, body: CreatePromoDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/promo.entity").Promo>>;
-    patchPromo(user: AuthenticatedUser, promoId: string, body: UpdatePromoDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/promo.entity").Promo>>;
-    listServices(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/service-config.entity").ServiceConfig[]>>;
-    getService(serviceId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/service-config.entity").ServiceConfig>>;
-    createServiceConfig(user: AuthenticatedUser, body: CreateServiceConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/service-config.entity").ServiceConfig>>;
-    patchServiceConfig(user: AuthenticatedUser, serviceId: string, body: UpdateServiceConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/service-config.entity").ServiceConfig>>;
+    listPricing(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PricingConfigStatus;
+        name: string;
+        service: string;
+        pricingRules: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]>>;
+    getPricing(pricingId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PricingConfigStatus;
+        name: string;
+        service: string;
+        pricingRules: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    createPricing(user: AuthenticatedUser, body: CreatePricingConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PricingConfigStatus;
+        name: string;
+        service: string;
+        pricingRules: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    patchPricing(user: AuthenticatedUser, pricingId: string, body: UpdatePricingConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PricingConfigStatus;
+        name: string;
+        service: string;
+        pricingRules: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    listPromos(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PromoStatus;
+        description: string;
+        code: string;
+        discountType: import(".prisma/client").$Enums.PromoDiscountType;
+        discountValue: import("@prisma/client-runtime-utils").Decimal;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]>>;
+    getPromo(promoId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PromoStatus;
+        description: string;
+        code: string;
+        discountType: import(".prisma/client").$Enums.PromoDiscountType;
+        discountValue: import("@prisma/client-runtime-utils").Decimal;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    createPromo(user: AuthenticatedUser, body: CreatePromoDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PromoStatus;
+        description: string;
+        code: string;
+        discountType: import(".prisma/client").$Enums.PromoDiscountType;
+        discountValue: import("@prisma/client-runtime-utils").Decimal;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    patchPromo(user: AuthenticatedUser, promoId: string, body: UpdatePromoDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.PromoStatus;
+        description: string;
+        code: string;
+        discountType: import(".prisma/client").$Enums.PromoDiscountType;
+        discountValue: import("@prisma/client-runtime-utils").Decimal;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    listServices(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        name: string;
+        key: string;
+        enabled: boolean;
+        configuration: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]>>;
+    getService(serviceId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        name: string;
+        key: string;
+        enabled: boolean;
+        configuration: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    createServiceConfig(user: AuthenticatedUser, body: CreateServiceConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        name: string;
+        key: string;
+        enabled: boolean;
+        configuration: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
+    patchServiceConfig(user: AuthenticatedUser, serviceId: string, body: UpdateServiceConfigDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        name: string;
+        key: string;
+        enabled: boolean;
+        configuration: import("@prisma/client/runtime/client").JsonValue;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }>>;
     getTaxConfig(req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         regionId: string;
         currency: string;
@@ -147,7 +247,7 @@ export declare class AdminConfigController {
         id: string;
         key: string;
         title: string;
-        scope: "driver" | "rider" | "fleet" | "global" | "admin";
+        scope: "rider" | "driver" | "fleet" | "admin" | "global";
         status: "active" | "draft" | "archived";
         content: string;
         version: number;

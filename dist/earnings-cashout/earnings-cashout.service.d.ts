@@ -1,20 +1,33 @@
-import { Repository } from 'typeorm';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { WalletAccount } from '../entities/wallet-account.entity';
-import { CashoutRequest } from '../entities/cashout-request.entity';
+import { PrismaService } from '../prisma/prisma.service';
 export declare class EarningsCashoutService {
-    private earningsRepo;
-    private walletRepo;
-    private cashoutRepo;
-    constructor(earningsRepo: Repository<EarningsLedger>, walletRepo: Repository<WalletAccount>, cashoutRepo: Repository<CashoutRequest>);
+    private readonly prisma;
+    constructor(prisma: PrismaService);
     getSummary(driverId: string, period?: 'day' | 'week' | 'month' | 'quarter' | 'year'): Promise<{
         period: "day" | "week" | "month" | "quarter" | "year";
         total: number;
         currency: string;
         count: number;
     }>;
-    getEvents(driverId: string): Promise<EarningsLedger[]>;
-    getWallet(driverId: string): Promise<WalletAccount | {
+    getEvents(driverId: string): Promise<{
+        type: import(".prisma/client").$Enums.EarningsType;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        tripId: string | null;
+        deliveryOrderId: string | null;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+    }[]>;
+    getWallet(driverId: string): Promise<{
+        id: string;
+        driverId: string | null;
+        updatedAt: Date;
+        userId: string;
+        currency: string;
+        balance: import("@prisma/client-runtime-utils").Decimal;
+        settings: import("@prisma/client/runtime/client").JsonValue;
+    } | {
         driverId: string;
         currency: string;
         balance: number;
@@ -27,7 +40,27 @@ export declare class EarningsCashoutService {
     createCashoutRequest(driverId: string, input: {
         methodId: string;
         amount: number;
-    }): Promise<CashoutRequest>;
-    listCashoutRequests(driverId: string): Promise<CashoutRequest[]>;
+    }): Promise<{
+        status: import(".prisma/client").$Enums.CashoutStatus;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        method: import("@prisma/client/runtime/client").JsonValue;
+    }>;
+    listCashoutRequests(driverId: string): Promise<{
+        status: import(".prisma/client").$Enums.CashoutStatus;
+        id: string;
+        driverId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        amount: import("@prisma/client-runtime-utils").Decimal;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
+        method: import("@prisma/client/runtime/client").JsonValue;
+    }[]>;
     private periodThresholdDate;
 }

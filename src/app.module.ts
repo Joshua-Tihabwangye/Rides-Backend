@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
 import { DatabaseModule } from './database/database.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
@@ -38,6 +39,7 @@ import { JwtStrategy } from './auth/jwt.strategy';
       limit: 100,
     }]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    PrismaModule,
     DatabaseModule,
     RedisModule,
     CommonModule,

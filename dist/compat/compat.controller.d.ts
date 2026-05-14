@@ -9,9 +9,20 @@ export declare class CompatibilityController {
         documentType: string;
         fileUrl: string;
         expiryDate: string;
-    }, res: Response): Promise<import("../entities/user-document.entity").UserDocument>;
+    }, res: Response): Promise<{
+        status: import(".prisma/client").$Enums.DocumentStatus;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        documentType: string;
+        fileUrl: string;
+        expiryDate: string;
+        rejectionReason: string | null;
+        userType: string;
+    }>;
     getLegacyDocumentStatus(driverId: string, res: Response): Promise<{
-        userType: "driver" | "rider" | "fleet" | "admin";
+        userType: "rider" | "driver" | "fleet" | "admin";
         documents: ({
             id: string;
             documentType: string;
@@ -25,7 +36,7 @@ export declare class CompatibilityController {
             documentType: string;
             fileUrl: string;
             expiryDate: string;
-            reviewStatus: string;
+            reviewStatus: import(".prisma/client").$Enums.DocumentStatus;
             expiryStatus: "expired" | "valid" | "expiring_soon";
             daysUntilExpiry: number;
         })[];
@@ -36,7 +47,23 @@ export declare class CompatibilityController {
         requestId: string | string[];
         orders?: undefined;
     } | {
-        orders: import("../entities/job-offer.entity").JobOffer[];
+        orders: {
+            status: import(".prisma/client").$Enums.JobOfferStatus;
+            type: string | null;
+            expiresAt: Date | null;
+            id: string;
+            driverId: string;
+            riderId: string | null;
+            createdAt: Date;
+            tripId: string;
+            pickupLocation: import("@prisma/client/runtime/client").JsonValue | null;
+            dropoffLocation: import("@prisma/client/runtime/client").JsonValue | null;
+            pickup: string | null;
+            dropoff: string | null;
+            route: import("@prisma/client/runtime/client").JsonValue | null;
+            estimatedFare: import("@prisma/client-runtime-utils").Decimal;
+            respondedAt: Date | null;
+        }[];
         code?: undefined;
         message?: undefined;
         requestId?: undefined;

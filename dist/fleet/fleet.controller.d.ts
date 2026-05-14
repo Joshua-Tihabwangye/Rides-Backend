@@ -7,12 +7,78 @@ export declare class FleetController {
     private readonly fleetService;
     private readonly apiResponse;
     constructor(fleetService: FleetService, apiResponse: ApiResponseService);
-    getProfile(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-partner-profile.entity").FleetPartnerProfile>>;
-    patchProfile(user: AuthenticatedUser, body: UpdateFleetProfileDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-partner-profile.entity").FleetPartnerProfile>>;
-    listBranches(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-branch.entity").FleetBranch[]>>;
-    getBranchById(user: AuthenticatedUser, branchId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-branch.entity").FleetBranch>>;
-    createBranch(user: AuthenticatedUser, body: UpsertFleetBranchDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-branch.entity").FleetBranch>>;
-    patchBranch(user: AuthenticatedUser, branchId: string, body: PatchFleetBranchDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<import("../entities/fleet-branch.entity").FleetBranch>>;
+    getProfile(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.FleetPartnerStatus;
+        companyName: string;
+        contactEmail: string | null;
+        contactPhone: string | null;
+        registrationNumber: string | null;
+        taxId: string | null;
+        id: string;
+        fleetId: string | null;
+        userId: string;
+        verticals: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
+    patchProfile(user: AuthenticatedUser, body: UpdateFleetProfileDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        status: import(".prisma/client").$Enums.FleetPartnerStatus;
+        companyName: string;
+        contactEmail: string | null;
+        contactPhone: string | null;
+        registrationNumber: string | null;
+        taxId: string | null;
+        id: string;
+        fleetId: string | null;
+        userId: string;
+        verticals: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
+    listBranches(user: AuthenticatedUser, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }[]>>;
+    getBranchById(user: AuthenticatedUser, branchId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
+    createBranch(user: AuthenticatedUser, body: UpsertFleetBranchDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
+    patchBranch(user: AuthenticatedUser, branchId: string, body: PatchFleetBranchDto, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
+        phone: string | null;
+        city: string | null;
+        country: string | null;
+        name: string;
+        id: string;
+        fleetId: string | null;
+        fleetPartnerId: string;
+        address: string | null;
+        managerName: string | null;
+        operatingHours: import("@prisma/client/runtime/client").JsonValue;
+    }>>;
     deleteBranch(user: AuthenticatedUser, branchId: string, req: Request): Promise<import("../common/api/api.types").ApiSuccessResponse<{
         deleted: boolean;
     }>>;

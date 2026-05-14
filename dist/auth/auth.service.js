@@ -8,28 +8,19 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 var AuthService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto_1 = require("crypto");
-const user_entity_1 = require("../entities/user.entity");
-const role_entity_1 = require("../entities/role.entity");
-const user_role_entity_1 = require("../entities/user-role.entity");
+const prisma_service_1 = require("../prisma/prisma.service");
 const redis_service_1 = require("../redis/redis.service");
 const jwt_secret_1 = require("./jwt-secret");
 let AuthService = AuthService_1 = class AuthService {
-    constructor(userRepo, roleRepo, userRoleRepo, redis) {
-        this.userRepo = userRepo;
-        this.roleRepo = roleRepo;
-        this.userRoleRepo = userRoleRepo;
+    constructor(prisma, redis) {
+        this.prisma = prisma;
         this.redis = redis;
         this.logger = new common_1.Logger(AuthService_1.name);
         this.JWT_SECRET = (0, jwt_secret_1.getJwtSecret)();
@@ -37,7 +28,7 @@ let AuthService = AuthService_1 = class AuthService {
         this.REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
     }
     async register(data) {
-        const existing = await this.userRepo.findOne({ where: { email: data.email } });
+        const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
         if (existing) {
             throw new common_1.ConflictException('EMAIL_ALREADY_EXISTS');
         }
@@ -45,26 +36,29 @@ let AuthService = AuthService_1 = class AuthService {
         const requestedRole = data.roles?.find((role) => allowedRegistrationRoles.has(role));
         const defaultRoles = [requestedRole ?? 'rider'];
         const hashedPassword = await bcrypt.hash(data.password, 12);
-        const user = this.userRepo.create({
-            email: data.email,
-            password: hashedPassword,
-            phone: data.phone,
-            roles: defaultRoles,
+        const user = await this.prisma.user.create({
+            data: {
+                email: data.email,
+                password: hashedPassword,
+                phone: data.phone,
+                roles: defaultRoles,
+            },
         });
-        await this.userRepo.save(user);
         for (const roleName of defaultRoles) {
-            const role = await this.roleRepo.findOne({ where: { name: roleName } });
+            const role = await this.prisma.role.findUnique({ where: { name: roleName } });
             if (role) {
-                await this.userRoleRepo.save({ user, role });
+                await this.prisma.userRole.create({
+                    data: { userId: user.id, roleId: role.id },
+                });
             }
         }
         this.logger.log(`User registered: ${user.email} with roles [${defaultRoles.join(', ')}]`);
-        return this.generateTokens(user);
+        return this.generateTokens(user.id, user.email, defaultRoles);
     }
     async login(email, password) {
-        const user = await this.userRepo.findOne({
+        const user = await this.prisma.user.findUnique({
             where: { email },
-            relations: ['userRoles', 'userRoles.role'],
+            include: { userRoles: { include: { role: true } } },
         });
         if (!user) {
             throw new common_1.UnauthorizedException('INVALID_CREDENTIALS');
@@ -73,28 +67,30 @@ let AuthService = AuthService_1 = class AuthService {
         if (!valid) {
             throw new common_1.UnauthorizedException('INVALID_CREDENTIALS');
         }
-        return this.generateTokens(user);
+        const roles = user.userRoles?.map((ur) => ur.role.name) || user.roles || [];
+        return this.generateTokens(user.id, user.email, roles);
     }
     async refresh(refreshToken) {
         const userId = await this.redis.get(`refresh:${refreshToken}`);
         if (!userId) {
             throw new common_1.UnauthorizedException('INVALID_REFRESH_TOKEN');
         }
-        const user = await this.userRepo.findOne({
+        const user = await this.prisma.user.findUnique({
             where: { id: userId },
-            relations: ['userRoles', 'userRoles.role'],
+            include: { userRoles: { include: { role: true } } },
         });
         if (!user) {
             throw new common_1.UnauthorizedException('USER_NOT_FOUND');
         }
         await this.redis.del(`refresh:${refreshToken}`);
-        return this.generateTokens(user);
+        const roles = user.userRoles?.map((ur) => ur.role.name) || user.roles || [];
+        return this.generateTokens(user.id, user.email, roles);
     }
     async logout(refreshToken) {
         await this.redis.del(`refresh:${refreshToken}`);
     }
     async requestPasswordReset(email) {
-        const user = await this.userRepo.findOne({ where: { email } });
+        const user = await this.prisma.user.findUnique({ where: { email } });
         if (!user) {
             return { sent: true };
         }
@@ -119,27 +115,24 @@ let AuthService = AuthService_1 = class AuthService {
             throw new common_1.UnauthorizedException('INVALID_OTP');
         }
         await this.redis.del(key);
-        const user = await this.userRepo.findOne({ where: { email } });
+        const user = await this.prisma.user.findUnique({ where: { email } });
         if (!user) {
             throw new common_1.NotFoundException('USER_NOT_FOUND');
         }
-        user.password = await bcrypt.hash(newPassword, 12);
-        await this.userRepo.save(user);
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        await this.prisma.user.update({ where: { id: user.id }, data: { password: hashedPassword } });
         this.logger.log(`Password reset for ${email}`);
         return { reset: true };
     }
-    async generateTokens(user) {
-        const relationRoles = user.userRoles?.map((ur) => ur.role.name) ?? [];
-        const roles = relationRoles.length ? relationRoles : (user.roles ?? []);
-        const payload = { sub: user.id, email: user.email, roles };
+    async generateTokens(userId, email, roles) {
+        const payload = { sub: userId, email, roles };
         const accessToken = jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN });
         const refreshToken = (0, crypto_1.randomBytes)(48).toString('hex');
         const refreshTtl = 7 * 24 * 60 * 60;
-        await this.redis.set(`refresh:${refreshToken}`, user.id, refreshTtl);
+        await this.redis.set(`refresh:${refreshToken}`, userId, refreshTtl);
         const userResponse = {
-            id: user.id,
-            email: user.email,
-            phone: user.phone,
+            id: userId,
+            email,
             roles,
         };
         return { accessToken, refreshToken, user: userResponse };
@@ -151,12 +144,7 @@ let AuthService = AuthService_1 = class AuthService {
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = AuthService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __param(1, (0, typeorm_1.InjectRepository)(role_entity_1.Role)),
-    __param(2, (0, typeorm_1.InjectRepository)(user_role_entity_1.UserRole)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         redis_service_1.RedisService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

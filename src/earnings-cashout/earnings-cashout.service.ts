@@ -1,25 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { WalletAccount } from '../entities/wallet-account.entity';
-import { CashoutRequest } from '../entities/cashout-request.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class EarningsCashoutService {
-  constructor(
-    @InjectRepository(EarningsLedger) private earningsRepo: Repository<EarningsLedger>,
-    @InjectRepository(WalletAccount) private walletRepo: Repository<WalletAccount>,
-    @InjectRepository(CashoutRequest) private cashoutRepo: Repository<CashoutRequest>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getSummary(driverId: string, period: 'day' | 'week' | 'month' | 'quarter' | 'year' = 'week') {
     const threshold = this.periodThresholdDate(period);
 
-    const events = await this.earningsRepo.find({
+    const events = await this.prisma.earningsLedger.findMany({
       where: {
         driverId,
-        createdAt: MoreThanOrEqual(threshold),
+        createdAt: { gte: threshold },
       },
     });
 
@@ -33,14 +25,14 @@ export class EarningsCashoutService {
   }
 
   async getEvents(driverId: string) {
-    return this.earningsRepo.find({
+    return this.prisma.earningsLedger.findMany({
       where: { driverId },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async getWallet(driverId: string) {
-    const wallet = await this.walletRepo.findOne({ where: { driverId } });
+    const wallet = await this.prisma.walletAccount.findFirst({ where: { driverId } });
     if (!wallet) {
       return {
         driverId,
@@ -59,7 +51,7 @@ export class EarningsCashoutService {
   }
 
   async createCashoutRequest(driverId: string, input: { methodId: string; amount: number }) {
-    const wallet = await this.walletRepo.findOne({ where: { driverId } });
+    const wallet = await this.prisma.walletAccount.findFirst({ where: { driverId } });
     if (!wallet) {
       throw new BadRequestException('Wallet not found');
     }
@@ -68,23 +60,26 @@ export class EarningsCashoutService {
       throw new BadRequestException('Insufficient wallet balance');
     }
 
-    wallet.balance = Number(wallet.balance) - input.amount;
-    await this.walletRepo.save(wallet);
-
-    const request = this.cashoutRepo.create({
-      driverId,
-      method: { id: input.methodId },
-      amount: input.amount,
-      status: 'pending',
+    await this.prisma.walletAccount.update({
+      where: { id: wallet.id },
+      data: { balance: Number(wallet.balance) - input.amount },
     });
-    await this.cashoutRepo.save(request);
-    return request;
+
+    return this.prisma.cashoutRequest.create({
+      data: {
+        driverId,
+        userId: wallet.userId,
+        method: { id: input.methodId },
+        amount: input.amount,
+        status: 'pending',
+      },
+    });
   }
 
   async listCashoutRequests(driverId: string) {
-    return this.cashoutRepo.find({
+    return this.prisma.cashoutRequest.findMany({
       where: { driverId },
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

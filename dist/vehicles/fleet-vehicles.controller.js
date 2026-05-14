@@ -92,7 +92,7 @@ let FleetVehiclesController = class FleetVehiclesController {
             status: 'under_review',
             updatedAt: Date.now(),
         };
-        await this.vehiclesService.updateFleet(fleetId, vehicleId, { documents });
+        await this.vehiclesService.updateFleet(fleetId, vehicleId, { documents: documents });
         return this.apiResponse.success({
             code: 'FLEET_VEHICLE_DOCUMENT_CREATED',
             message: 'Fleet vehicle document created',

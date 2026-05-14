@@ -1,54 +1,54 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Vehicle } from '../entities/vehicle.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class VehiclesService {
-  constructor(@InjectRepository(Vehicle) private vehicleRepo: Repository<Vehicle>) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(driverId: string) {
-    return this.vehicleRepo.find({ where: { driverId } });
+    return this.prisma.vehicle.findMany({ where: { driverId } });
   }
 
   async listFleet(fleetId: string) {
-    return this.vehicleRepo.find({ where: { fleetPartnerId: fleetId } });
+    return this.prisma.vehicle.findMany({ where: { fleetPartnerId: fleetId } });
   }
 
   async createFleet(
     fleetId: string,
     input: { make: string; model: string; year: number; plate: string; type: string; status: string; accessories?: Record<string, any> },
   ) {
-    const created = this.vehicleRepo.create({
-      fleetPartnerId: fleetId,
-      driverId: null as any, // Not assigned to a driver yet, assuming nullable string but typeorm sometimes requires casting if strict
-      make: input.make,
-      model: input.model,
-      year: input.year,
-      licensePlate: input.plate,
-      type: input.type,
-      status: input.status,
-      accessories: input.accessories ?? {},
+    return this.prisma.vehicle.create({
+      data: {
+        fleetPartnerId: fleetId,
+        driverId: '',
+        make: input.make,
+        model: input.model,
+        year: input.year,
+        licensePlate: input.plate,
+        type: input.type as any,
+        status: input.status as any,
+        accessories: input.accessories ?? {},
+      },
     });
-    return this.vehicleRepo.save(created);
   }
 
   async create(driverId: string, input: { make: string; model: string; year: number; plate: string; type: string; status: string; accessories?: Record<string, any> }) {
-    const created = this.vehicleRepo.create({
-      driverId,
-      make: input.make,
-      model: input.model,
-      year: input.year,
-      licensePlate: input.plate,
-      type: input.type,
-      status: input.status,
-      accessories: input.accessories ?? {},
+    return this.prisma.vehicle.create({
+      data: {
+        driverId,
+        make: input.make,
+        model: input.model,
+        year: input.year,
+        licensePlate: input.plate,
+        type: input.type as any,
+        status: input.status as any,
+        accessories: input.accessories ?? {},
+      },
     });
-    return this.vehicleRepo.save(created);
   }
 
   async findById(driverId: string, vehicleId: string) {
-    const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, driverId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, driverId } });
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');
     }
@@ -57,7 +57,7 @@ export class VehiclesService {
   }
 
   async findFleetVehicleById(fleetId: string, vehicleId: string) {
-    const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetPartnerId: fleetId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetPartnerId: fleetId } });
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');
     }
@@ -65,34 +65,31 @@ export class VehiclesService {
     return vehicle;
   }
 
-  async update(driverId: string, vehicleId: string, patch: Partial<Vehicle>) {
-    const vehicle = await this.findById(driverId, vehicleId);
-    Object.assign(vehicle, patch);
-    return this.vehicleRepo.save(vehicle);
+  async update(driverId: string, vehicleId: string, patch: Record<string, any>) {
+    await this.findById(driverId, vehicleId);
+    return this.prisma.vehicle.update({ where: { id: vehicleId }, data: patch });
   }
 
-  async updateFleet(fleetId: string, vehicleId: string, patch: Partial<Vehicle>) {
-    const vehicle = await this.findFleetVehicleById(fleetId, vehicleId);
-    Object.assign(vehicle, patch);
-    return this.vehicleRepo.save(vehicle);
+  async updateFleet(fleetId: string, vehicleId: string, patch: Record<string, any>) {
+    await this.findFleetVehicleById(fleetId, vehicleId);
+    return this.prisma.vehicle.update({ where: { id: vehicleId }, data: patch });
   }
 
   async remove(driverId: string, vehicleId: string) {
-    const vehicle = await this.findById(driverId, vehicleId);
-    await this.vehicleRepo.remove(vehicle);
+    await this.findById(driverId, vehicleId);
+    await this.prisma.vehicle.delete({ where: { id: vehicleId } });
     return { deleted: true };
   }
 
   async removeFleet(fleetId: string, vehicleId: string) {
-    const vehicle = await this.findFleetVehicleById(fleetId, vehicleId);
-    await this.vehicleRepo.remove(vehicle);
+    await this.findFleetVehicleById(fleetId, vehicleId);
+    await this.prisma.vehicle.delete({ where: { id: vehicleId } });
     return { deleted: true };
   }
 
   async patchAccessories(driverId: string, vehicleId: string, accessories: Record<string, any>) {
-    const vehicle = await this.findById(driverId, vehicleId);
-    vehicle.accessories = accessories;
-    return this.vehicleRepo.save(vehicle);
+    await this.findById(driverId, vehicleId);
+    return this.prisma.vehicle.update({ where: { id: vehicleId }, data: { accessories } });
   }
 
   async uploadDocument(
@@ -101,18 +98,17 @@ export class VehiclesService {
     input: { documentType: string; fileUrl: string; expiryDate: string },
   ) {
     const vehicle = await this.findById(driverId, vehicleId);
-    const documents = vehicle.documents || {};
-    
+    const documents = (vehicle.documents as Record<string, any>) || {};
+
     documents[input.documentType] = {
       fileUrl: input.fileUrl,
       expiryDate: input.expiryDate,
       status: 'under_review',
       updatedAt: Date.now(),
     };
-    
-    vehicle.documents = documents;
-    await this.vehicleRepo.save(vehicle);
-    
+
+    await this.prisma.vehicle.update({ where: { id: vehicleId }, data: { documents } });
+
     return documents[input.documentType];
   }
 }

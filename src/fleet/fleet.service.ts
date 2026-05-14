@@ -1,21 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Between, MoreThanOrEqual } from 'typeorm';
-import { FleetPartnerProfile } from '../entities/fleet-partner-profile.entity';
-import { FleetBranch } from '../entities/fleet-branch.entity';
-import { FleetDriver } from '../entities/fleet-driver.entity';
-import { FleetDispatch } from '../entities/fleet-dispatch.entity';
-import { FleetServiceRecord } from '../entities/fleet-service-record.entity';
-import { FleetPayout } from '../entities/fleet-payout.entity';
-import { FleetComplianceIncident } from '../entities/fleet-compliance-incident.entity';
-import { FleetTrainingCourse } from '../entities/fleet-training-course.entity';
-import { User } from '../entities/user.entity';
-import { DriverProfile } from '../entities/driver-profile.entity';
-import { Trip } from '../entities/trip.entity';
-import { JobOffer } from '../entities/job-offer.entity';
-import { EarningsLedger } from '../entities/earnings-ledger.entity';
-import { Vehicle } from '../entities/vehicle.entity';
-import { RiderServiceRequest } from '../entities/rider-service-request.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { FleetRealtimeGateway } from '../realtime/scoped-realtime.gateway';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,27 +16,13 @@ export class FleetService {
   }>();
 
   constructor(
-    @InjectRepository(FleetPartnerProfile) private fleetProfileRepo: Repository<FleetPartnerProfile>,
-    @InjectRepository(FleetBranch) private fleetBranchRepo: Repository<FleetBranch>,
-    @InjectRepository(FleetDriver) private fleetDriverRepo: Repository<FleetDriver>,
-    @InjectRepository(FleetDispatch) private fleetDispatchRepo: Repository<FleetDispatch>,
-    @InjectRepository(FleetServiceRecord) private fleetServiceRepo: Repository<FleetServiceRecord>,
-    @InjectRepository(FleetPayout) private fleetPayoutRepo: Repository<FleetPayout>,
-    @InjectRepository(FleetComplianceIncident) private complianceRepo: Repository<FleetComplianceIncident>,
-    @InjectRepository(FleetTrainingCourse) private trainingRepo: Repository<FleetTrainingCourse>,
-    @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(DriverProfile) private driverProfileRepo: Repository<DriverProfile>,
-    @InjectRepository(Trip) private tripRepo: Repository<Trip>,
-    @InjectRepository(JobOffer) private jobOfferRepo: Repository<JobOffer>,
-    @InjectRepository(EarningsLedger) private earningsLedgerRepo: Repository<EarningsLedger>,
-    @InjectRepository(Vehicle) private vehicleRepo: Repository<Vehicle>,
-    @InjectRepository(RiderServiceRequest) private riderServiceRequestRepo: Repository<RiderServiceRequest>,
+    private readonly prisma: PrismaService,
     private readonly fleetRealtimeGateway: FleetRealtimeGateway,
   ) {}
 
   async getProfile(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    const profile = await this.fleetProfileRepo.findOne({ where: { fleetId } });
+    const profile = await this.prisma.fleetPartnerProfile.findFirst({ where: { fleetId } });
     if (!profile) {
       throw new NotFoundException('Fleet profile not found');
     }
@@ -70,13 +40,15 @@ export class FleetService {
     }>,
   ) {
     const profile = await this.getProfile(userId);
-    Object.assign(profile, patch);
-    return this.fleetProfileRepo.save(profile);
+    return this.prisma.fleetPartnerProfile.update({
+      where: { id: profile.id },
+      data: patch,
+    });
   }
 
   async listBranches(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    return this.fleetBranchRepo.find({ where: { fleetId } });
+    return this.prisma.fleetBranch.findMany({ where: { fleetId } });
   }
 
   async createBranch(
@@ -92,11 +64,9 @@ export class FleetService {
     },
   ) {
     const fleetId = await this.getFleetId(userId);
-    const branch = this.fleetBranchRepo.create({
-      fleetId,
-      ...input,
+    return this.prisma.fleetBranch.create({
+      data: { fleetId, ...input } as any,
     });
-    return this.fleetBranchRepo.save(branch);
   }
 
   async patchBranch(
@@ -113,18 +83,18 @@ export class FleetService {
     }>,
   ) {
     const fleetId = await this.getFleetId(userId);
-    const branch = await this.fleetBranchRepo.findOne({ where: { id: branchId, fleetId } });
+    const branch = await this.prisma.fleetBranch.findFirst({ where: { id: branchId, fleetId } });
     if (!branch) {
       throw new NotFoundException('Fleet branch not found');
     }
-    Object.assign(branch, patch);
-    return this.fleetBranchRepo.save(branch);
+    return this.prisma.fleetBranch.update({ where: { id: branchId }, data: patch as any });
   }
 
   async deleteBranch(userId: string, branchId: string) {
     const fleetId = await this.getFleetId(userId);
-    const result = await this.fleetBranchRepo.delete({ id: branchId, fleetId });
-    if (result.affected === 0) {
+    try {
+      await this.prisma.fleetBranch.delete({ where: { id: branchId } });
+    } catch {
       throw new NotFoundException('Fleet branch not found');
     }
     return { deleted: true };
@@ -132,7 +102,7 @@ export class FleetService {
 
   async listDrivers(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    return this.fleetDriverRepo.find({ where: { fleetId } });
+    return this.prisma.fleetDriver.findMany({ where: { fleetId } });
   }
 
   async createDriver(
@@ -153,58 +123,60 @@ export class FleetService {
     const driverId = uuidv4();
     const userRecordId = uuidv4();
 
-    const user = this.userRepo.create({
-      id: userRecordId,
-      email: input.email,
-      password: 'password123',
-      phone: input.phone,
-      roles: ['driver'],
-      status: 'active',
-      driverId,
-    });
-    await this.userRepo.save(user);
-
-    const profile = this.driverProfileRepo.create({
-      driverId,
-      fleetId,
-      branchId: input.branchId,
-      fullName: input.fullName,
-      email: input.email,
-      phone: input.phone,
-      city: input.city ?? 'Kampala',
-      country: input.country ?? 'Uganda',
-      onboardingStatus: 'incomplete',
-      preferences: {
-        areaIds: [],
-        serviceIds: input.serviceModes ?? ['ride'],
-        requirementIds: [],
-      },
-      checkpoints: {
-        roleSelected: true,
-        documentsVerified: false,
-        identityVerified: false,
-        vehicleReady: false,
-        emergencyContactReady: false,
-        trainingCompleted: false,
+    await this.prisma.user.create({
+      data: {
+        id: userRecordId,
+        email: input.email,
+        password: 'password123',
+        phone: input.phone,
+        roles: ['driver'],
+        status: 'active',
+        driverId,
       },
     });
-    await this.driverProfileRepo.save(profile);
 
-    const fleetDriver = this.fleetDriverRepo.create({
-      fleetId,
-      userId: userRecordId,
-      driverId,
-      branchId: input.branchId,
-      fullName: input.fullName,
-      email: input.email,
-      phone: input.phone,
-      city: input.city,
-      country: input.country,
-      status: 'invited',
-      serviceModes: input.serviceModes ?? ['ride'],
+    await this.prisma.driverProfile.create({
+      data: {
+        userId: userRecordId,
+        fleetId,
+        branchId: input.branchId,
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.phone,
+        city: input.city ?? 'Kampala',
+        country: input.country ?? 'Uganda',
+        onboardingStatus: 'incomplete',
+        preferences: {
+          areaIds: [],
+          serviceIds: input.serviceModes ?? ['ride'],
+          requirementIds: [],
+        },
+        checkpoints: {
+          roleSelected: true,
+          documentsVerified: false,
+          identityVerified: false,
+          vehicleReady: false,
+          emergencyContactReady: false,
+          trainingCompleted: false,
+        },
+      },
     });
 
-    return this.fleetDriverRepo.save(fleetDriver);
+    return this.prisma.fleetDriver.create({
+      data: {
+        fleetId,
+        userId: userRecordId,
+        driverId,
+        branchId: input.branchId,
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.phone,
+        city: input.city,
+        country: input.country,
+        status: 'invited',
+        serviceModes: input.serviceModes ?? ['ride'],
+      },
+    });
   }
 
   async patchDriver(
@@ -224,43 +196,50 @@ export class FleetService {
     const fleetId = await this.getFleetId(userId);
     await this.ensureBranchBelongsToFleet(fleetId, patch.branchId);
 
-    const fleetDriver = await this.fleetDriverRepo.findOne({ where: { driverId, fleetId } });
+    const fleetDriver = await this.prisma.fleetDriver.findFirst({ where: { driverId, fleetId } });
     if (!fleetDriver) {
       throw new NotFoundException('Fleet driver not found');
     }
 
-    Object.assign(fleetDriver, patch);
-    await this.fleetDriverRepo.save(fleetDriver);
+    await this.prisma.fleetDriver.update({ where: { id: fleetDriver.id }, data: patch });
 
-    const profile = await this.driverProfileRepo.findOne({ where: { driverId } });
+    const profile = await this.prisma.driverProfile.findFirst({ where: { userId: fleetDriver.userId } });
     if (profile) {
-      profile.branchId = patch.branchId ?? profile.branchId;
-      profile.fullName = patch.fullName ?? profile.fullName;
-      profile.email = patch.email ?? profile.email;
-      profile.phone = patch.phone ?? profile.phone;
-      profile.city = patch.city ?? profile.city;
-      profile.country = patch.country ?? profile.country;
-      if (patch.serviceModes) {
-        profile.preferences = { ...profile.preferences, serviceIds: patch.serviceModes };
-      }
-      await this.driverProfileRepo.save(profile);
+      const prefData: Record<string, unknown> = {};
+      if (patch.serviceModes) prefData.serviceIds = patch.serviceModes;
+      await this.prisma.driverProfile.update({
+        where: { id: profile.id },
+        data: {
+          branchId: patch.branchId ?? profile.branchId,
+          fullName: patch.fullName ?? profile.fullName,
+          email: patch.email ?? profile.email,
+          phone: patch.phone ?? profile.phone,
+          city: patch.city ?? profile.city,
+          country: patch.country ?? profile.country,
+          ...(Object.keys(prefData).length ? { preferences: { ...(profile.preferences as any), ...prefData } } : {}),
+        },
+      });
     }
 
-    const user = await this.userRepo.findOne({ where: { driverId } });
+    const user = await this.prisma.user.findFirst({ where: { id: fleetDriver.userId } });
     if (user) {
-      user.email = patch.email ?? user.email;
-      user.phone = patch.phone ?? user.phone;
-      await this.userRepo.save(user);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          email: patch.email ?? user.email,
+          phone: patch.phone ?? user.phone,
+        },
+      });
     }
 
-    return fleetDriver;
+    return this.prisma.fleetDriver.findFirst({ where: { id: fleetDriver.id } });
   }
 
   async listDispatches(userId: string, type?: string) {
     const fleetId = await this.getFleetId(userId);
     const where: any = { fleetId };
     if (type) where.type = type;
-    return this.fleetDispatchRepo.find({ where });
+    return this.prisma.fleetDispatch.findMany({ where });
   }
 
   async createDispatch(
@@ -282,48 +261,53 @@ export class FleetService {
     await this.ensureFleetVehicle(fleetId, input.vehicleId);
 
     const tripId = uuidv4();
-    const dispatch = this.fleetDispatchRepo.create({
-      fleetId,
-      type,
-      status: input.driverId ? 'assigned' : 'pending',
-      driverId: input.driverId,
-      vehicleId: input.vehicleId,
-      tripId,
-      pickup: input.pickup,
-      dropoff: input.dropoff,
-      notes: input.notes,
-    });
 
-    const trip = this.tripRepo.create({
-      id: tripId,
-      riderId: `fleet:${fleetId}`,
-      driverId: input.driverId,
-      fleetId,
-      type: type as any,
-      status: 'requested',
-      pickup: input.pickup,
-      dropoff: input.dropoff,
-      pickupLocation: { lat: 0, lng: 0 },
-      dropoffLocation: { lat: 0, lng: 0 },
-      otpCode: String(Math.floor(1000 + Math.random() * 9000)),
-    });
-
-    const savedDispatch = await this.fleetDispatchRepo.save(dispatch);
-    await this.tripRepo.save(trip);
-
-    if (input.driverId) {
-      const job = this.jobOfferRepo.create({
+    const savedDispatch = await this.prisma.fleetDispatch.create({
+      data: {
+        fleetId,
+        type,
+        status: input.driverId ? 'assigned' : 'pending',
         driverId: input.driverId,
-        riderId: trip.riderId,
+        vehicleId: input.vehicleId,
         tripId,
-        type: type as any,
-        status: 'offered',
         pickup: input.pickup,
         dropoff: input.dropoff,
-        pickupLocation: { lat: 0, lng: 0 },
-        dropoffLocation: { lat: 0, lng: 0 },
+        notes: input.notes,
+      },
+    });
+
+    const trip = await this.prisma.trip.create({
+      data: {
+        id: tripId,
+        riderId: `fleet:${fleetId}`,
+        driverId: input.driverId,
+        fleetId,
+        type: type as any,
+        status: 'requested' as any,
+        pickup: input.pickup,
+        dropoff: input.dropoff,
+        pickupAddress: input.pickup,
+        dropoffAddress: input.dropoff,
+        pickupLocation: { lat: 0, lng: 0 } as any,
+        dropoffLocation: { lat: 0, lng: 0 } as any,
+        otpCode: String(Math.floor(1000 + Math.random() * 9000)),
+      } as any,
+    });
+
+    if (input.driverId) {
+      await this.prisma.jobOffer.create({
+        data: {
+          driverId: input.driverId,
+          riderId: trip.riderId,
+          tripId,
+          type: type as any,
+          status: 'offered',
+          pickup: input.pickup,
+          dropoff: input.dropoff,
+          pickupLocation: { lat: 0, lng: 0 } as any,
+          dropoffLocation: { lat: 0, lng: 0 } as any,
+        },
       });
-      await this.jobOfferRepo.save(job);
     }
 
     this.publishFleetSyncEvent(userId, 'dispatch.created', {
@@ -340,21 +324,19 @@ export class FleetService {
 
   async listTrips(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    // Find trips where fleetId matches OR driver is one of our fleet drivers
-    const drivers = await this.fleetDriverRepo.find({ where: { fleetId } });
-    const driverIds = drivers.map(d => d.driverId);
-    
-    return this.tripRepo.find({
-      where: [
-        { fleetId },
-        { driverId: In(driverIds) }
-      ]
+    const drivers = await this.prisma.fleetDriver.findMany({ where: { fleetId } });
+    const driverIds = drivers.map((d) => d.driverId).filter(Boolean) as string[];
+
+    return this.prisma.trip.findMany({
+      where: {
+        OR: [{ fleetId }, { driverId: { in: driverIds } }],
+      },
     });
   }
 
   async listServices(userId: string, service: string) {
     const fleetId = await this.getFleetId(userId);
-    return this.fleetServiceRepo.find({ where: { fleetId, service } });
+    return this.prisma.fleetServiceRecord.findMany({ where: { fleetId, service: service as any } });
   }
 
   async createService(
@@ -365,16 +347,17 @@ export class FleetService {
     const fleetId = await this.getFleetId(userId);
     await this.ensureFleetVehicle(fleetId, input.assetId);
 
-    const record = this.fleetServiceRepo.create({
-      fleetId,
-      service,
-      status: 'pending',
-      customerName: input.customerName,
-      assetId: input.assetId,
-      scheduledAt: input.scheduledAt,
-      notes: input.notes,
+    return this.prisma.fleetServiceRecord.create({
+      data: {
+        fleetId,
+        service: service as any,
+        status: 'pending' as any,
+        customerName: input.customerName,
+        assetId: input.assetId,
+        scheduledAt: input.scheduledAt,
+        notes: input.notes,
+      } as any,
     });
-    return this.fleetServiceRepo.save(record);
   }
 
   async getEarningsSummary(userId: string, period: 'day' | 'week' | 'month' | 'quarter' | 'year' = 'week') {
@@ -407,12 +390,12 @@ export class FleetService {
 
   async getPayouts(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    return this.fleetPayoutRepo.find({ where: { fleetId } });
+    return this.prisma.fleetPayout.findMany({ where: { fleetId } });
   }
 
   async listComplianceIncidents(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    return this.complianceRepo.find({ where: { fleetId } });
+    return this.prisma.fleetComplianceIncident.findMany({ where: { fleetId } });
   }
 
   async createComplianceIncident(
@@ -420,14 +403,15 @@ export class FleetService {
     input: { category: string; severity: string; description: string },
   ) {
     const fleetId = await this.getFleetId(userId);
-    const incident = this.complianceRepo.create({
-      fleetId,
-      category: input.category,
-      severity: input.severity,
-      status: 'open',
-      description: input.description,
+    const saved = await this.prisma.fleetComplianceIncident.create({
+      data: {
+        fleetId,
+        category: input.category,
+        severity: input.severity as any,
+        status: 'open' as any,
+        description: input.description,
+      },
     });
-    const saved = await this.complianceRepo.save(incident);
     this.publishFleetSyncEvent(userId, 'fleet.alert', {
       alertType: 'compliance.incident.created',
       incidentId: saved.id,
@@ -440,20 +424,21 @@ export class FleetService {
 
   async listTrainingCourses(userId: string) {
     const fleetId = await this.getFleetId(userId);
-    return this.trainingRepo.find({ where: { fleetId } });
+    return this.prisma.fleetTrainingCourse.findMany({ where: { fleetId } });
   }
 
   async createTrainingCourse(userId: string, input: { title: string; assignedTo?: string }) {
     const fleetId = await this.getFleetId(userId);
     await this.ensureFleetDriver(fleetId, input.assignedTo);
 
-    const course = this.trainingRepo.create({
-      fleetId,
-      title: input.title,
-      status: 'draft',
-      assignedTo: input.assignedTo,
+    const saved = await this.prisma.fleetTrainingCourse.create({
+      data: {
+        fleetId,
+        title: input.title,
+        status: 'draft',
+        assignedTo: input.assignedTo,
+      },
     });
-    const saved = await this.trainingRepo.save(course);
     this.publishFleetSyncEvent(userId, 'fleet.alert', {
       alertType: 'compliance.training.created',
       courseId: saved.id,
@@ -472,9 +457,9 @@ export class FleetService {
     if (query.serviceType) where.serviceType = query.serviceType;
     if (query.status) where.status = query.status;
 
-    const records = await this.riderServiceRequestRepo.find({
+    const records = await this.prisma.riderServiceRequest.findMany({
       where,
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
     });
 
     return records.map((record) => ({
@@ -491,7 +476,7 @@ export class FleetService {
 
   async getBranchById(userId: string, branchId: string) {
     const fleetId = await this.getFleetId(userId);
-    const branch = await this.fleetBranchRepo.findOne({ where: { id: branchId, fleetId } });
+    const branch = await this.prisma.fleetBranch.findFirst({ where: { id: branchId, fleetId } });
     if (!branch) {
       throw new NotFoundException('Fleet branch not found');
     }
@@ -500,7 +485,7 @@ export class FleetService {
 
   async getDriverById(userId: string, driverId: string) {
     const fleetId = await this.getFleetId(userId);
-    const driver = await this.fleetDriverRepo.findOne({ where: { fleetId, driverId } });
+    const driver = await this.prisma.fleetDriver.findFirst({ where: { fleetId, driverId } });
     if (!driver) {
       throw new NotFoundException('Fleet driver not found');
     }
@@ -509,57 +494,61 @@ export class FleetService {
 
   async deleteDriver(userId: string, driverId: string) {
     const fleetId = await this.getFleetId(userId);
-    const result = await this.fleetDriverRepo.delete({ fleetId, driverId });
-    if (!result.affected) {
+    const driver = await this.prisma.fleetDriver.findFirst({ where: { fleetId, driverId } });
+    if (!driver) {
       throw new NotFoundException('Fleet driver not found');
     }
+    await this.prisma.fleetDriver.delete({ where: { id: driver.id } });
     return { deleted: true };
   }
 
   async removeVehicle(userId: string, vehicleId: string) {
     const fleetId = await this.getFleetId(userId);
-    const result = await this.vehicleRepo.delete({ id: vehicleId, fleetId });
-    if (!result.affected) {
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetId } });
+    if (!vehicle) {
       throw new NotFoundException('Fleet vehicle not found');
     }
+    await this.prisma.vehicle.delete({ where: { id: vehicleId } });
     return { deleted: true };
   }
 
   async listVehicleDocuments(userId: string, vehicleId: string) {
     const fleetId = await this.getFleetId(userId);
-    const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetId } });
     if (!vehicle) {
       throw new NotFoundException('Fleet vehicle not found');
     }
-    const documents = vehicle.documents || {};
+    const documents = (vehicle.documents as Record<string, unknown>) || {};
     return Object.entries(documents).map(([documentType, payload]) => ({ documentType, ...(payload as object) }));
   }
 
   async createVehicleDocument(userId: string, vehicleId: string, input: { documentType: string; fileUrl: string; expiryDate?: string }) {
     const fleetId = await this.getFleetId(userId);
-    const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetId } });
     if (!vehicle) {
       throw new NotFoundException('Fleet vehicle not found');
     }
-    const documents = vehicle.documents || {};
+    const documents = (vehicle.documents as Record<string, unknown>) || {};
     documents[input.documentType] = {
       fileUrl: input.fileUrl,
       expiryDate: input.expiryDate || null,
       status: 'under_review',
       updatedAt: Date.now(),
     };
-    vehicle.documents = documents;
-    await this.vehicleRepo.save(vehicle);
-    return { documentType: input.documentType, ...documents[input.documentType] };
+    await this.prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: { documents: documents as any },
+    });
+    return { documentType: input.documentType, ...(documents as any)[input.documentType] };
   }
 
   async listVehicleMaintenanceHistory(userId: string, vehicleId: string) {
     const fleetId = await this.getFleetId(userId);
-    const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetId } });
     if (!vehicle) {
       throw new NotFoundException('Fleet vehicle not found');
     }
-    const accessories = vehicle.accessories || {};
+    const accessories = (vehicle.accessories as Record<string, unknown>) || {};
     const history = Array.isArray(accessories.maintenanceHistory) ? accessories.maintenanceHistory : [];
     return history;
   }
@@ -570,11 +559,11 @@ export class FleetService {
     input: { title: string; notes?: string; cost?: number; servicedAt?: number },
   ) {
     const fleetId = await this.getFleetId(userId);
-    const vehicle = await this.vehicleRepo.findOne({ where: { id: vehicleId, fleetId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, fleetId } });
     if (!vehicle) {
       throw new NotFoundException('Fleet vehicle not found');
     }
-    const accessories = vehicle.accessories || {};
+    const accessories = (vehicle.accessories as Record<string, any>) || {};
     const history = Array.isArray(accessories.maintenanceHistory) ? accessories.maintenanceHistory : [];
     const record = {
       id: uuidv4(),
@@ -586,14 +575,16 @@ export class FleetService {
     };
     history.unshift(record);
     accessories.maintenanceHistory = history.slice(0, 500);
-    vehicle.accessories = accessories;
-    await this.vehicleRepo.save(vehicle);
+    await this.prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: { accessories: accessories as any },
+    });
     return record;
   }
 
   async getDispatchById(userId: string, dispatchId: string) {
     const fleetId = await this.getFleetId(userId);
-    const dispatch = await this.fleetDispatchRepo.findOne({ where: { id: dispatchId, fleetId } });
+    const dispatch = await this.prisma.fleetDispatch.findFirst({ where: { id: dispatchId, fleetId } });
     if (!dispatch) {
       throw new NotFoundException('Fleet dispatch not found');
     }
@@ -602,37 +593,36 @@ export class FleetService {
 
   async patchDispatch(userId: string, dispatchId: string, patch: Partial<{ pickup: string; dropoff: string; notes: string; status: string; driverId: string; vehicleId: string }>) {
     const fleetId = await this.getFleetId(userId);
-    const dispatch = await this.fleetDispatchRepo.findOne({ where: { id: dispatchId, fleetId } });
+    const dispatch = await this.prisma.fleetDispatch.findFirst({ where: { id: dispatchId, fleetId } });
     if (!dispatch) {
       throw new NotFoundException('Fleet dispatch not found');
     }
     await this.ensureFleetDriver(fleetId, patch.driverId);
     await this.ensureFleetVehicle(fleetId, patch.vehicleId);
-    Object.assign(dispatch, patch);
-    return this.fleetDispatchRepo.save(dispatch);
+    return this.prisma.fleetDispatch.update({ where: { id: dispatchId }, data: patch as any });
   }
 
   async deleteDispatch(userId: string, dispatchId: string) {
     const fleetId = await this.getFleetId(userId);
-    const result = await this.fleetDispatchRepo.delete({ id: dispatchId, fleetId });
-    if (!result.affected) {
+    const dispatch = await this.prisma.fleetDispatch.findFirst({ where: { id: dispatchId, fleetId } });
+    if (!dispatch) {
       throw new NotFoundException('Fleet dispatch not found');
     }
+    await this.prisma.fleetDispatch.delete({ where: { id: dispatchId } });
     return { deleted: true };
   }
 
   async assignDispatch(userId: string, dispatchId: string, input: { driverId?: string; vehicleId?: string }) {
-    const patched = await this.patchDispatch(userId, dispatchId, {
+    return this.patchDispatch(userId, dispatchId, {
       driverId: input.driverId,
       vehicleId: input.vehicleId,
       status: input.driverId ? 'assigned' : 'pending',
     });
-    return patched;
   }
 
   async getServiceById(userId: string, service: string, serviceId: string) {
     const fleetId = await this.getFleetId(userId);
-    const record = await this.fleetServiceRepo.findOne({ where: { id: serviceId, fleetId, service } });
+    const record = await this.prisma.fleetServiceRecord.findFirst({ where: { id: serviceId, fleetId, service: service as any } });
     if (!record) {
       throw new NotFoundException('Fleet service record not found');
     }
@@ -646,13 +636,12 @@ export class FleetService {
     patch: Partial<{ customerName: string; assetId: string; scheduledAt: number; notes: string; status: string }>,
   ) {
     const fleetId = await this.getFleetId(userId);
-    const record = await this.fleetServiceRepo.findOne({ where: { id: serviceId, fleetId, service } });
+    const record = await this.prisma.fleetServiceRecord.findFirst({ where: { id: serviceId, fleetId, service: service as any } });
     if (!record) {
       throw new NotFoundException('Fleet service record not found');
     }
     await this.ensureFleetVehicle(fleetId, patch.assetId);
-    Object.assign(record, patch);
-    return this.fleetServiceRepo.save(record);
+    return this.prisma.fleetServiceRecord.update({ where: { id: serviceId }, data: patch as any });
   }
 
   async cancelServiceById(userId: string, service: string, serviceId: string, reason?: string) {
@@ -661,7 +650,7 @@ export class FleetService {
 
   async getComplianceIncidentById(userId: string, incidentId: string) {
     const fleetId = await this.getFleetId(userId);
-    const incident = await this.complianceRepo.findOne({ where: { id: incidentId, fleetId } });
+    const incident = await this.prisma.fleetComplianceIncident.findFirst({ where: { id: incidentId, fleetId } });
     if (!incident) {
       throw new NotFoundException('Compliance incident not found');
     }
@@ -674,17 +663,16 @@ export class FleetService {
     patch: Partial<{ category: string; severity: string; status: string; description: string }>,
   ) {
     const fleetId = await this.getFleetId(userId);
-    const incident = await this.complianceRepo.findOne({ where: { id: incidentId, fleetId } });
+    const incident = await this.prisma.fleetComplianceIncident.findFirst({ where: { id: incidentId, fleetId } });
     if (!incident) {
       throw new NotFoundException('Compliance incident not found');
     }
-    Object.assign(incident, patch);
-    return this.complianceRepo.save(incident);
+    return this.prisma.fleetComplianceIncident.update({ where: { id: incidentId }, data: patch as any });
   }
 
   async getTrainingCourseById(userId: string, courseId: string) {
     const fleetId = await this.getFleetId(userId);
-    const course = await this.trainingRepo.findOne({ where: { id: courseId, fleetId } });
+    const course = await this.prisma.fleetTrainingCourse.findFirst({ where: { id: courseId, fleetId } });
     if (!course) {
       throw new NotFoundException('Training course not found');
     }
@@ -698,20 +686,20 @@ export class FleetService {
   ) {
     const fleetId = await this.getFleetId(userId);
     await this.ensureFleetDriver(fleetId, patch.assignedTo);
-    const course = await this.trainingRepo.findOne({ where: { id: courseId, fleetId } });
+    const course = await this.prisma.fleetTrainingCourse.findFirst({ where: { id: courseId, fleetId } });
     if (!course) {
       throw new NotFoundException('Training course not found');
     }
-    Object.assign(course, patch);
-    return this.trainingRepo.save(course);
+    return this.prisma.fleetTrainingCourse.update({ where: { id: courseId }, data: patch as any });
   }
 
   async deleteTrainingCourseById(userId: string, courseId: string) {
     const fleetId = await this.getFleetId(userId);
-    const result = await this.trainingRepo.delete({ id: courseId, fleetId });
-    if (!result.affected) {
+    const course = await this.prisma.fleetTrainingCourse.findFirst({ where: { id: courseId, fleetId } });
+    if (!course) {
       throw new NotFoundException('Training course not found');
     }
+    await this.prisma.fleetTrainingCourse.delete({ where: { id: courseId } });
     return { deleted: true };
   }
 
@@ -726,7 +714,7 @@ export class FleetService {
 
   async getPayoutById(userId: string, payoutId: string) {
     const fleetId = await this.getFleetId(userId);
-    const payout = await this.fleetPayoutRepo.findOne({ where: { id: payoutId, fleetId } });
+    const payout = await this.prisma.fleetPayout.findFirst({ where: { id: payoutId, fleetId } });
     if (!payout) {
       throw new NotFoundException('Payout not found');
     }
@@ -821,7 +809,7 @@ export class FleetService {
   async schoolListAttendance(userId: string, studentId?: string) {
     const fleetId = await this.getFleetId(userId);
     const entries = this.getSchoolStore(fleetId).attendance;
-    return studentId ? entries.filter((item) => item.studentId === studentId) : entries;
+    return studentId ? entries.filter((item: any) => item.studentId === studentId) : entries;
   }
 
   async schoolUpsertAttendance(userId: string, input: Record<string, unknown>) {
@@ -936,19 +924,19 @@ export class FleetService {
   async schoolRoster(userId: string, routeId?: string) {
     const students = await this.schoolListStudents(userId);
     if (!routeId) return students;
-    return students.filter((item) => item.routeId === routeId);
+    return students.filter((item: any) => item.routeId === routeId);
   }
 
   async schoolTripCalendar(userId: string, date?: string) {
     const trips = await this.schoolListTrips(userId);
     if (!date) return trips;
-    return trips.filter((trip) => String(trip.date || trip.scheduledDate || '').startsWith(date));
+    return trips.filter((trip) => String((trip as any).date || (trip as any).scheduledDate || '').startsWith(date));
   }
 
   async schoolPerformanceReport(userId: string) {
     const trips = await this.schoolListTrips(userId);
     const attendance = await this.schoolListAttendance(userId);
-    const completedTrips = trips.filter((trip) => trip.status === 'completed').length;
+    const completedTrips = trips.filter((trip) => (trip as any).status === 'completed').length;
     return {
       tripsTotal: trips.length,
       tripsCompleted: completedTrips,
@@ -973,13 +961,13 @@ export class FleetService {
   }
 
   private async getFleetId(userId: string) {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
     return user?.fleetId ?? userId;
   }
 
   private async ensureBranchBelongsToFleet(fleetId: string, branchId?: string) {
     if (!branchId) return;
-    const branch = await this.fleetBranchRepo.findOne({ where: { id: branchId, fleetId } });
+    const branch = await this.prisma.fleetBranch.findFirst({ where: { id: branchId, fleetId } });
     if (!branch) {
       throw new BadRequestException('Branch does not belong to this fleet');
     }
@@ -987,7 +975,7 @@ export class FleetService {
 
   private async ensureFleetDriver(fleetId: string, driverId?: string) {
     if (!driverId) return;
-    const driver = await this.fleetDriverRepo.findOne({ where: { fleetId, driverId } });
+    const driver = await this.prisma.fleetDriver.findFirst({ where: { fleetId, driverId } });
     if (!driver) {
       throw new BadRequestException('Driver does not belong to this fleet');
     }
@@ -995,19 +983,19 @@ export class FleetService {
 
   private async ensureFleetVehicle(fleetId: string, vehicleId?: string) {
     if (!vehicleId) return;
-    const vehicle = await this.vehicleRepo.findOne({ where: { fleetId, id: vehicleId } });
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { fleetId, id: vehicleId } });
     if (!vehicle) {
       throw new BadRequestException('Vehicle does not belong to this fleet');
     }
   }
 
   private async getFleetEarningsEvents(fleetId: string, period?: 'day' | 'week' | 'month' | 'quarter' | 'year') {
-    const drivers = await this.fleetDriverRepo.find({ where: { fleetId } });
-    const driverIds = drivers.map(d => d.driverId);
-    
+    const drivers = await this.prisma.fleetDriver.findMany({ where: { fleetId } });
+    const driverIds = drivers.map((d) => d.driverId).filter(Boolean) as string[];
+
     const now = new Date();
     let threshold: Date | null = null;
-    
+
     if (period) {
       threshold = new Date();
       if (period === 'day') threshold.setDate(now.getDate() - 1);
@@ -1017,27 +1005,11 @@ export class FleetService {
       else if (period === 'year') threshold.setFullYear(now.getFullYear() - 1);
     }
 
-    const where: any = [
-      { userId: In(driverIds) }
-    ];
-    
-    // TypeORM multiple where clauses are ORed. We need (fleetId OR driverId) AND createdAt >= threshold.
-    // This is a bit tricky with find option.
-    // Better to use QueryBuilder for complex logic, but let's try to keep it simple.
-    
+    const where: any = { userId: { in: driverIds } };
     if (threshold) {
-      // We'd need to apply threshold to each OR branch
-      return this.earningsLedgerRepo.find({
-        where: [
-          { userId: In(driverIds), createdAt: MoreThanOrEqual(threshold) }
-        ]
-      });
+      where.createdAt = { gte: threshold };
     }
 
-    return this.earningsLedgerRepo.find({
-      where: [
-        { userId: In(driverIds) }
-      ]
-    });
+    return this.prisma.earningsLedger.findMany({ where });
   }
 }
