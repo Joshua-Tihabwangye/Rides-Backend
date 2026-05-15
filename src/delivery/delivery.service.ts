@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PresenceLocationService } from '../presence-location/presence-location.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
+import { KafkaTopics } from '../kafka/kafka.topics';
 import type { CreateDeliveryOrderDto } from './dto/delivery.dto';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,6 +15,7 @@ export class DeliveryService {
     @Optional() private readonly presenceLocationService?: PresenceLocationService,
     @Optional() private readonly realtimeGateway?: RealtimeGateway,
     @Optional() private readonly riderRealtimeGateway?: RiderRealtimeGateway,
+    @Optional() private readonly kafka?: KafkaProducerService,
   ) {}
 
   async createOrder(riderId: string, input: CreateDeliveryOrderDto) {
@@ -350,13 +353,19 @@ export class DeliveryService {
     status: 'draft' | 'requested' | 'accepted' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'partially_completed' | 'delivered' | 'cancelled' | 'failed',
     note?: string,
   ) {
-    this.riderRealtimeGateway?.publishToUser(riderId, 'delivery.patch', {
+    const payload = {
       orderId,
+      riderId,
       status,
       note,
       tracking: {
         updatedAt: new Date().toISOString(),
       },
+    };
+    this.riderRealtimeGateway?.publishToUser(riderId, 'delivery.patch', payload);
+    this.kafka?.emit(KafkaTopics.DELIVERIES, 'delivery.status.updated', payload, {
+      key: orderId,
+      userId: riderId,
     });
   }
 }

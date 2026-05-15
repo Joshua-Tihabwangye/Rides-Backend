@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException, Optional } from '@n
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RiderRealtimeGateway } from '../realtime/scoped-realtime.gateway';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
+import { KafkaTopics } from '../kafka/kafka.topics';
 import { TripStatus } from '@prisma/client';
 
 const TRANSITIONS: Record<TripStatus, TripStatus[]> = {
@@ -20,6 +22,7 @@ export class TripsService {
     private readonly prisma: PrismaService,
     @Optional() private readonly realtimeGateway?: RealtimeGateway,
     @Optional() private readonly riderRealtimeGateway?: RiderRealtimeGateway,
+    @Optional() private readonly kafka?: KafkaProducerService,
   ) {}
 
   async getActive(driverId: string) {
@@ -187,6 +190,11 @@ export class TripsService {
       payload,
     });
     this.riderRealtimeGateway?.publishToUser(trip.riderId, event, payload);
+
+    this.kafka?.emit(KafkaTopics.TRIPS, event, payload, {
+      key: trip.id,
+      userId: trip.driverId || trip.riderId,
+    });
   }
 
   private async transition(driverId: string, tripId: string, next: TripStatus) {

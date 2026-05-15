@@ -3,10 +3,12 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { CacheModule } from '@nestjs/cache-manager';
 import { AdminModule } from './admin/admin.module';
 import { DatabaseModule } from './database/database.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { KafkaModule } from './kafka/kafka.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { StorageModule } from './storage/storage.module';
@@ -42,6 +44,23 @@ import { JwtStrategy } from './auth/jwt.strategy';
     PrismaModule,
     DatabaseModule,
     RedisModule,
+    KafkaModule,
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: async () => {
+        const redisDisabled = (process.env.REDIS_DISABLED || '').trim().toLowerCase() === 'true';
+        if (redisDisabled) {
+          return { ttl: 60 * 1000, max: 100 };
+        }
+        const { redisStore } = await import('cache-manager-ioredis-yet');
+        return {
+          store: await redisStore({
+            url: process.env.REDIS_URL || 'redis://localhost:6379',
+          }),
+          ttl: 300 * 1000,
+        };
+      },
+    }),
     CommonModule,
     StorageModule,
     AuthModule,
